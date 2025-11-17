@@ -1,0 +1,173 @@
+/* index.css */
+/*  필수: 루트가 높이를 가져야 Leaflet가 보인다 */
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background: #f6f7f9;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+/* ✅ 전체 레이아웃: 위에 헤더+툴바, 아래에 지도+패널 */
+.layout {
+  min-height: 100vh;
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  grid-template-columns: 1fr;
+}
+
+/* ✅ 상단 헤더 */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #eee;
+  background: #fff;
+}
+.brand {
+  font-weight: 700;
+}
+.tabs {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.tab {
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.1s;
+  background: transparent;
+  border: none;
+  font: inherit;
+  color: inherit;
+}
+.tab:hover {
+  background: #eef1f4;
+}
+.tab.active {
+  background: #f0f2f5;
+  font-weight: 600;
+}
+
+/* ✅ 툴바 (SDG 선택/연도 선택) */
+.toolbar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 16px;
+  border-bottom: 1px solid #eee;
+  background: #fff;
+}
+.toolbar .spacer {
+  flex: 1;
+}
+.toolbar select {
+  padding: 4px 6px;
+  border-radius: 6px;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  font-size: 0.9rem;
+}
+
+/* ✅ 본문: 왼쪽 지도, 오른쪽 패널 */
+.content {
+  display: grid;
+  grid-template-columns: 1fr minmax(320px, 420px);
+  gap: 16px;
+  padding: 12px;
+  box-sizing: border-box;
+  min-height: 0;
+}
+
+/* ✅ 지도 영역 */
+.mapWrap {
+  min-width: 0;
+  position: relative; /* 레전드를 지도 위에 올리기 위해 */
+}
+
+/* 지도 높이: 헤더+툴바 합친 높이를 뺀 값.
+   필요하면 140 → 150 / 160으로 살짝 조절해도 돼 */
+.mapWrap .leaflet-container {
+  height: calc(100vh - 140px);
+  width: 100%;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #dbeafe; /* 타일을 안 쓰므로 배경색 */
+  outline: none;
+}
+
+/* ✅ 우측 패널 */
+.panel {
+  border: 1px solid #eee;
+  border-radius: 10px;
+  background: #fff;
+  padding: 12px;
+  box-sizing: border-box;
+  min-height: 0;
+}
+.panel h3 {
+  margin: 6px 0 8px;
+}
+
+/* ✅ 범례: 지도 오른쪽 아래에 띄우기 */
+.legend {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(2px);
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+  min-width: 140px;
+}
+.legend .row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.legend .row:last-child {
+  margin-bottom: 0;
+}
+.legend .swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+}
+
+/* ✅ Leaflet 레이어/툴팁 z-index (포인트가 폴리곤 위로) */
+.leaflet-container .leaflet-tooltip {
+  z-index: 500;
+}
+
+/* 📱 반응형: 900px 이하에서는 패널을 아래로 */
+@media (max-width: 900px) {
+  .content {
+    grid-template-columns: 1fr;
+  }
+  .mapWrap .leaflet-container {
+    height: 60vh; /* 모바일에서는 너무 크지 않게 */
+  }
+  .legend {
+    right: 8px;
+    bottom: 8px;
+  }
+}
+
+/* 📱 더 작은 화면: 툴바 요소가 겹치지 않게 줄바꿈 */
+@media (max-width: 600px) {
+  .toolbar {
+    flex-wrap: wrap;
+  }
+  .tabs {
+    gap: 6px;
+  }
+}
