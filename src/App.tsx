@@ -6,6 +6,7 @@ import CountyValueLabels from './components/CountyValueLabels'
 import countiesGeojsonRaw from './data/counties_500k.json'
 import statesGeojsonRaw from './data/usa_state_20m.json'
 import msaToCountiesRows from './data/msaTOcounties.json'
+import employmentRowsData from './data/emp_AnnualSalary.json'
 import { buildMsaToCountiesFromList } from './utils/crosswalk'
 
 type Row = { area_name: string; sdg: string; sdg_lq: number }
@@ -14,7 +15,15 @@ type MetricsByCounty = Record<string, Record<string, number>>
 type StateRow = { state_num: number; state_name: string; sdg: string; sdg_lq: number }
 type StateEung = StateRow[]
 type MetricsByState = Record<string, Record<string, number>>
-type MapPage = 'msa' | 'state'
+type EmploymentRow = {
+  year: number
+  total_code: string
+  total_title: string
+  tot_emp: number
+  annual_w: number
+  sdg: string
+}
+type MapPage = 'msa' | 'state' | 'employment'
 
 function sortSdgKeys(keys: string[]) {
   const rx = /^SDG-(\d{1,2})$/i
@@ -52,9 +61,18 @@ const allStateYearsData: Record<number, StateEung> = Object.fromEntries(
 
 const MSA_AVAILABLE_YEARS = Object.keys(allYearsData).map(Number).sort((a, b) => a - b)
 const STATE_AVAILABLE_YEARS = Object.keys(allStateYearsData).map(Number).sort((a, b) => a - b)
+const employmentRows: EmploymentRow[] = (employmentRowsData as EmploymentRow[]) ?? []
+const EMPLOYMENT_OCCUPATIONS = Array.from(new Set(employmentRows.map((row) => row.total_title))).sort((a, b) =>
+  a.localeCompare(b)
+)
+const STANDARD_SDG_CODES = Array.from({ length: 16 }, (_, i) => `SDG-${String(i + 1).padStart(2, '0')}`)
+const EMPLOYMENT_SDGS = STANDARD_SDG_CODES.filter((code) =>
+  employmentRows.some((row) => row.sdg === code)
+)
 const MAP_TABS: { id: MapPage; label: string }[] = [
   { id: 'msa', label: 'MSA Map' },
-  { id: 'state', label: 'State Map' }
+  { id: 'state', label: 'State Map' },
+  { id: 'employment', label: 'Employment Insights' }
 ]
 const CONTIGUOUS_US_BOUNDS: LatLngBoundsExpression = [
   [24.396308, -124.848974],
@@ -96,6 +114,18 @@ export default function App() {
   const [showLabels, setShowLabels] = React.useState(true)
   const [activeStateYear, setActiveStateYear] = React.useState<number>(STATE_AVAILABLE_YEARS.at(-1) ?? 2000)
   const [activeStateSdg, setActiveStateSdg] = React.useState('SDG-01')
+  const [employmentFilterType, setEmploymentFilterType] = React.useState<'occupation' | 'sdg'>('occupation')
+  const [activeEmploymentOccupation, setActiveEmploymentOccupation] = React.useState<string>(EMPLOYMENT_OCCUPATIONS[0] ?? '')
+  const [activeEmploymentSdg, setActiveEmploymentSdg] = React.useState<string>(EMPLOYMENT_SDGS[0] ?? '')
+
+  React.useEffect(() => {
+    if (employmentFilterType === 'occupation' && !activeEmploymentOccupation && EMPLOYMENT_OCCUPATIONS[0]) {
+      setActiveEmploymentOccupation(EMPLOYMENT_OCCUPATIONS[0])
+    }
+    if (employmentFilterType === 'sdg' && !activeEmploymentSdg && EMPLOYMENT_SDGS[0]) {
+      setActiveEmploymentSdg(EMPLOYMENT_SDGS[0])
+    }
+  }, [employmentFilterType, activeEmploymentOccupation, activeEmploymentSdg])
 
   const eung: EungMsa = React.useMemo(() => allYearsData[activeYear] ?? [], [activeYear])
   const stateEung: StateEung = React.useMemo(() => allStateYearsData[activeStateYear] ?? [], [activeStateYear])
@@ -161,6 +191,79 @@ export default function App() {
     return new Set(ids)
   }, [msaToCounties, activeMsa])
 
+  const employmentSeries = React.useMemo(() => {
+    if (employmentFilterType !== 'occupation') return []
+    return employmentRows
+      .filter((row) => row.total_title === activeEmploymentOccupation)
+      .sort((a, b) => a.year - b.year)
+  }, [employmentFilterType, activeEmploymentOccupation])
+
+  const employmentSelection = React.useMemo(
+    () => (employmentFilterType === 'occupation' ? employmentSeries.at(-1) : null),
+    [employmentFilterType, employmentSeries]
+  )
+
+  const employmentPreviewRows = React.useMemo(
+    () => (employmentFilterType === 'occupation' ? employmentSeries.slice(-8).reverse() : []),
+    [employmentFilterType, employmentSeries]
+  )
+  const employmentTrend = React.useMemo(
+    () =>
+      employmentSeries
+        .map((row) => ({ year: row.year, value: row.tot_emp }))
+        .filter((point) => Number.isFinite(point.value)),
+    [employmentSeries]
+  )
+  const wageTrend = React.useMemo(
+    () =>
+      employmentSeries
+        .map((row) => ({ year: row.year, value: row.annual_w }))
+        .filter((point) => Number.isFinite(point.value)),
+    [employmentSeries]
+  )
+  const employmentSummaryTitle = employmentSelection?.total_title ?? activeEmploymentOccupation ?? 'Occupation'
+  const employmentSummaryContext = employmentSelection?.sdg ?? 'SDG N/A'
+  const employmentSummaryYear = employmentSelection?.year
+  const sdgOccupationSeries = React.useMemo(() => {
+    if (employmentFilterType !== 'sdg') return []
+    const grouped = new Map<string, EmploymentRow[]>()
+    for (const row of employmentRows) {
+      if (row.sdg !== activeEmploymentSdg) continue
+      const arr = grouped.get(row.total_title) ?? []
+      arr.push(row)
+      grouped.set(row.total_title, arr)
+    }
+    return Array.from(grouped.entries())
+      .map(([title, rows]) => ({ title, rows: rows.sort((a, b) => a.year - b.year) }))
+      .sort((a, b) => a.title.localeCompare(b.title))
+  }, [employmentFilterType, activeEmploymentSdg])
+  const sdgLatestRows = React.useMemo(() => {
+    if (employmentFilterType !== 'sdg') return []
+    return sdgOccupationSeries
+      .map(({ title, rows }) => {
+        const latest = rows.at(-1)
+        return latest
+          ? {
+              title,
+              sdg: latest.sdg,
+              year: latest.year,
+              tot_emp: latest.tot_emp,
+              annual_w: latest.annual_w
+            }
+          : null
+      })
+      .filter((row): row is { title: string; sdg: string; year: number; tot_emp: number; annual_w: number } => Boolean(row))
+      .sort((a, b) => Number(b.tot_emp ?? 0) - Number(a.tot_emp ?? 0))
+  }, [employmentFilterType, sdgOccupationSeries])
+  const formatNumber = (value?: number) => {
+    if (typeof value !== 'number' || !Number.isFinite(value)) return 'N/A'
+    return Math.round(value).toLocaleString()
+  }
+  const formatCurrency = (value?: number) => {
+    if (typeof value !== 'number' || !Number.isFinite(value)) return 'N/A'
+    return `$${Math.round(value).toLocaleString()}`
+  }
+
   return (
     <div className="layout">
       <div className="header">
@@ -180,21 +283,27 @@ export default function App() {
       </div>
 
       <div className="toolbar">
-        {activePage === 'msa' ? (
+        {activePage === 'msa' && (
           <>
             <label>Year</label>
             <select value={activeYear} onChange={(e) => setActiveYear(Number(e.target.value))}>
-              {MSA_AVAILABLE_YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+              {MSA_AVAILABLE_YEARS.map((y) => (
+                <option key={y} value={y}>{y}</option>
+              ))}
             </select>
 
             <label>SDG</label>
             <select value={activeSdg} onChange={(e) => setActiveSdg(e.target.value)}>
-              {sdgOptions.map((s) => <option key={s} value={s}>{s}</option>)}
+              {sdgOptions.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
             </select>
 
             <label>Area</label>
             <select value={activeMsa ?? ''} onChange={(e) => setActiveMsa(e.target.value)}>
-              {msaOptions.map((m) => <option key={m} value={m}>{m}</option>)}
+              {msaOptions.map((m) => (
+                <option key={m} value={m}>{m}</option>
+              ))}
             </select>
 
             <div className="spacer" />
@@ -202,93 +311,380 @@ export default function App() {
             <label>Labels</label>
             <input type="checkbox" checked={showLabels} onChange={(e) => setShowLabels(e.target.checked)} />
           </>
-        ) : (
+        )}
+
+        {activePage === 'state' && (
           <>
             <label>Year</label>
             <select value={activeStateYear} onChange={(e) => setActiveStateYear(Number(e.target.value))}>
-              {STATE_AVAILABLE_YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+              {STATE_AVAILABLE_YEARS.map((y) => (
+                <option key={y} value={y}>{y}</option>
+              ))}
             </select>
 
             <label>SDG</label>
             <select value={activeStateSdg} onChange={(e) => setActiveStateSdg(e.target.value)}>
-              {stateSdgOptions.map((s) => <option key={s} value={s}>{s}</option>)}
+              {stateSdgOptions.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
             </select>
 
             <div className="spacer" />
             <span>State-level overview</span>
           </>
         )}
+
+        {activePage === 'employment' && (
+          <>
+            <div className="segmented">
+              <button
+                type="button"
+                className={employmentFilterType === 'occupation' ? 'active' : ''}
+                onClick={() => setEmploymentFilterType('occupation')}
+              >
+                By occupation
+              </button>
+              <button
+                type="button"
+                className={employmentFilterType === 'sdg' ? 'active' : ''}
+                onClick={() => setEmploymentFilterType('sdg')}
+              >
+                By SDG
+              </button>
+            </div>
+
+            {employmentFilterType === 'occupation' ? (
+              <>
+                <label>Occupation</label>
+                <select value={activeEmploymentOccupation} onChange={(e) => setActiveEmploymentOccupation(e.target.value)}>
+                  {EMPLOYMENT_OCCUPATIONS.map((title) => (
+                    <option key={title} value={title}>{title}</option>
+                  ))}
+                </select>
+              </>
+            ) : (
+              <>
+                <label>SDG</label>
+                <select value={activeEmploymentSdg} onChange={(e) => setActiveEmploymentSdg(e.target.value)}>
+                  {EMPLOYMENT_SDGS.map((sdg) => (
+                    <option key={sdg} value={sdg}>{sdg}</option>
+                  ))}
+                </select>
+              </>
+            )}
+
+            <div className="spacer" />
+            <span>Pick either occupation or SDG to explore trends</span>
+          </>
+        )}
       </div>
 
       <div className="content">
         {activePage === 'msa' ? (
-          <>
-            <div className="mapWrap">
-              <SdgChoropleth
-                dataKey="msa"
-                geojson={countyGeojson}
-                idProperty="GEOID"
-                data={metrics}
-                years={sdgOptions}
-                initialYear={activeSdg}
-                title={`${activeSdg} (SDG LQ, ${activeYear})`}
-                valueFormatter={(v) => (typeof v === 'number' ? v.toFixed(2) : String(v ?? ''))}
-                center={[37.8, -96]}
-                zoom={4}
-                maxBounds={CONTIGUOUS_US_BOUNDS}
-                maxBoundsViscosity={1}
-                showBasemap={false}
-              >
-                {showLabels && (
-                  <CountyValueLabels
-                    geojson={countyGeojson}
-                    idProperty="GEOID"
-                    metrics={metrics}
-                    activeSdg={activeSdg}
-                    activeMsaCounties={activeCountySet}
-                  />
-                )}
-              </SdgChoropleth>
-            </div>
-
-            <aside className="panel">
-              <h3>MSA Details</h3>
-              <p>Selected Year: <b>{activeYear}</b></p>
-              <p>Selected SDG: <b>{activeSdg}</b></p>
-              <p>Selected Area (MSA): <b>{activeMsa ?? '-'}</b></p>
-              <p>This side panel can show MSA-level metric descriptions.</p>
-            </aside>
-          </>
+          <div className="mapWrap">
+            <SdgChoropleth
+              dataKey="msa"
+              geojson={countyGeojson}
+              idProperty="GEOID"
+              data={metrics}
+              years={sdgOptions}
+              initialYear={activeSdg}
+              title={`${activeSdg} (SDG LQ, ${activeYear})`}
+              valueFormatter={(v) => (typeof v === 'number' ? v.toFixed(2) : String(v ?? ''))}
+              center={[37.8, -96]}
+              zoom={4}
+              maxBounds={CONTIGUOUS_US_BOUNDS}
+              maxBoundsViscosity={1}
+              showBasemap={false}
+              showCategoryControl={false}
+              showResetButton={false}
+            >
+              {showLabels && (
+                <CountyValueLabels
+                  geojson={countyGeojson}
+                  idProperty="GEOID"
+                  metrics={metrics}
+                  activeSdg={activeSdg}
+                  activeMsaCounties={activeCountySet}
+                />
+              )}
+            </SdgChoropleth>
+          </div>
+        ) : activePage === 'state' ? (
+          <div className="mapWrap">
+            <SdgChoropleth
+              dataKey="state"
+              geojson={stateGeojson}
+              idProperty="STATE"
+              data={stateMetrics}
+              years={stateSdgOptions}
+              initialYear={activeStateSdg}
+              title={`${activeStateSdg} (State SDG LQ, ${activeStateYear})`}
+              valueFormatter={(v) => (typeof v === 'number' ? v.toFixed(2) : String(v ?? ''))}
+              center={[37.8, -96]}
+              zoom={4}
+              maxBounds={CONTIGUOUS_US_BOUNDS}
+              maxBoundsViscosity={1}
+              showBasemap={false}
+              showCategoryControl={false}
+              showResetButton={false}
+            />
+          </div>
         ) : (
-          <>
-            <div className="mapWrap">
-              <SdgChoropleth
-                dataKey="state"
-                geojson={stateGeojson}
-                idProperty="STATE"
-                data={stateMetrics}
-                years={stateSdgOptions}
-                initialYear={activeStateSdg}
-                title={`${activeStateSdg} (State SDG LQ, ${activeStateYear})`}
-                valueFormatter={(v) => (typeof v === 'number' ? v.toFixed(2) : String(v ?? ''))}
-                center={[37.8, -96]}
-                zoom={4}
-                maxBounds={CONTIGUOUS_US_BOUNDS}
-                maxBoundsViscosity={1}
-                showBasemap={false}
-              />
-            </div>
+          <div className="employmentContent">
+            {employmentFilterType === 'occupation' ? (
+              <>
+                <div className="panel">
+                  <h3>Employment &amp; Wage Snapshot</h3>
+                  {employmentSelection ? (
+                    <>
+                      <p>
+                        <b>{employmentSummaryTitle}</b>
+                        {employmentSummaryYear && (
+                          <>
+                            {' '}· Latest year: <b>{employmentSummaryYear}</b>
+                          </>
+                        )}
+                        {' '}({employmentSummaryContext})
+                      </p>
+                      <div className="statsGrid">
+                        <div className="statCard">
+                          <span className="statLabel">Employment</span>
+                          <span className="statValue">{formatNumber(employmentSelection.tot_emp)}</span>
+                          <small>people employed</small>
+                        </div>
+                        <div className="statCard">
+                          <span className="statLabel">Annual Wage</span>
+                          <span className="statValue">{formatCurrency(employmentSelection.annual_w)}</span>
+                          <small>average yearly pay</small>
+                        </div>
+                      </div>
+                      <div className="chartsGrid chartsGrid--triple">
+                        <TrendChart
+                          data={employmentTrend}
+                          title="Employment trend"
+                          valueFormatter={formatNumber}
+                          color="#2563eb"
+                          yAxisLabel="Employment (people)"
+                        />
+                        <TrendChart
+                          data={wageTrend}
+                          title="Annual wage trend"
+                          valueFormatter={formatCurrency}
+                          color="#ea580c"
+                          yAxisLabel="Annual Wage (USD)"
+                        />
+                      </div>
+                      <p className="muted">
+                        Trends update automatically when you choose a different occupation. Track how hiring
+                        and pay changed through time.
+                      </p>
+                    </>
+                  ) : (
+                    <p>No matching record exists for the chosen occupation.</p>
+                  )}
+                </div>
 
-            <aside className="panel">
-              <h3>State Details</h3>
-              <p>Selected Year: <b>{activeStateYear}</b></p>
-              <p>Selected SDG: <b>{activeStateSdg}</b></p>
-              <p>Each state displays its SDG location quotient for the chosen category.</p>
-              <p>Use the toolbar to change categories or years.</p>
-            </aside>
-          </>
+                <div className="panel">
+                  <h3>Recent Records (Last {employmentPreviewRows.length})</h3>
+                  {employmentPreviewRows.length ? (
+                    <div className="tableWrap">
+                      <table className="dataTable">
+                        <thead>
+                          <tr>
+                            <th>Year</th>
+                            <th>Employment</th>
+                            <th>Annual Wage</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {employmentPreviewRows.map((row) => (
+                            <tr key={`${row.total_code}-${row.year}-${row.sdg}`}>
+                              <td>{row.year}</td>
+                              <td>{formatNumber(row.tot_emp)}</td>
+                              <td>{formatCurrency(row.annual_w)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <p>No preview data for the selected occupation.</p>
+                  )}
+                  <p className="muted">Recent observations help confirm whether trends align with SDG priorities.</p>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="panel">
+                  <h3>{activeEmploymentSdg} Occupation Overview</h3>
+                  {sdgOccupationSeries.length ? (
+                    <p>
+                      Displaying <b>{sdgOccupationSeries.length}</b> occupations tracked under{' '}
+                      <b>{activeEmploymentSdg}</b>. Each card highlights employment history with the latest wage
+                      underneath.
+                    </p>
+                  ) : (
+                    <p>No occupations were tagged with this SDG.</p>
+                  )}
+                </div>
+
+                <div className="chartsGrid chartsGrid--triple">
+                  {sdgOccupationSeries.map(({ title, rows }) => {
+                    const latest = rows.at(-1)
+                    return (
+                      <TrendChart
+                        key={title}
+                        data={rows.map((row) => ({ year: row.year, value: row.tot_emp }))}
+                        title={title}
+                        valueFormatter={formatNumber}
+                        color="#2563eb"
+                        yAxisLabel="Employment (people)"
+                        footer={
+                          <div className="chartMeta">
+                            <span>Latest year: {latest?.year ?? 'N/A'}</span>
+                            <span>Wage: {formatCurrency(latest?.annual_w)}</span>
+                          </div>
+                        }
+                      />
+                    )
+                  })}
+                </div>
+
+                <div className="panel">
+                  <h3>{activeEmploymentSdg} Occupation Statistics</h3>
+                  {sdgLatestRows.length ? (
+                    <div className="tableWrap">
+                      <table className="dataTable">
+                        <thead>
+                          <tr>
+                            <th>Occupation</th>
+                            <th>Year</th>
+                            <th>Employment</th>
+                            <th>Annual Wage</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {sdgLatestRows.map((row) => (
+                            <tr key={`${row.title}-${row.year}`}>
+                              <td>{row.title}</td>
+                              <td>{row.year}</td>
+                              <td>{formatNumber(row.tot_emp)}</td>
+                              <td>{formatCurrency(row.annual_w)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <p>No statistics available for this SDG.</p>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
         )}
       </div>
+    </div>
+  )
+}
+
+type TrendPoint = { year: number; value: number }
+
+function TrendChart({
+  data,
+  title,
+  valueFormatter,
+  color = '#2563eb',
+  yAxisLabel = 'Value',
+  xAxisLabel = 'Year',
+  statLabel = 'Latest',
+  footer
+}: {
+  data: TrendPoint[]
+  title: string
+  valueFormatter?: (value: number) => string
+  color?: string
+  yAxisLabel?: string
+  xAxisLabel?: string
+  statLabel?: string
+  footer?: React.ReactNode
+}) {
+  const sorted = React.useMemo(() => [...data].sort((a, b) => a.year - b.year), [data])
+  if (!sorted.length) {
+    return (
+      <div className="chartCard">
+        <div className="chartHeader">
+          <h4>{title}</h4>
+        </div>
+        <p className="muted">No data available.</p>
+      </div>
+    )
+  }
+
+  const width = 360
+  const height = 160
+  const padding = 28
+  const minValue = sorted.reduce((min, point) => Math.min(min, point.value), sorted[0].value)
+  const maxValue = sorted.reduce((max, point) => Math.max(max, point.value), sorted[0].value)
+  const valueRange = maxValue - minValue || 1
+  const lastValue = sorted[sorted.length - 1]?.value
+  const formattedLastValue =
+    Number.isFinite(lastValue) && valueFormatter
+      ? valueFormatter(lastValue as number)
+      : Number.isFinite(lastValue)
+      ? Math.round(lastValue as number).toLocaleString()
+      : 'N/A'
+
+  const coordinates = sorted.map((point, idx) => {
+    const ratio = sorted.length > 1 ? idx / (sorted.length - 1) : 0
+    const x = padding + ratio * (width - padding * 2)
+    const y =
+      height - padding - ((point.value - minValue) / valueRange) * (height - padding * 2)
+    return { x, y }
+  })
+
+  const path = coordinates
+    .map((coord, idx) => `${idx === 0 ? 'M' : 'L'} ${coord.x.toFixed(2)} ${coord.y.toFixed(2)}`)
+    .join(' ')
+
+  return (
+    <div className="chartCard">
+      <div className="chartHeader">
+        <h4>{title}</h4>
+        <div className="chartStat">
+          {statLabel && <span className="chartStatLabel">{statLabel}</span>}
+          <span className="chartStatValue">{formattedLastValue}</span>
+        </div>
+      </div>
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        role="img"
+        aria-label={`${title} over time`}
+        className="trendChart"
+      >
+        <path d={path} fill="none" stroke={color} strokeWidth={3} strokeLinejoin="round" strokeLinecap="round" />
+        {coordinates.map((coord, idx) => (
+          <circle key={idx} cx={coord.x} cy={coord.y} r={4} fill={color} opacity={0.8} />
+        ))}
+        <text
+          x={12}
+          y={height / 2}
+          textAnchor="middle"
+          transform={`rotate(-90 12 ${height / 2})`}
+          className="axisLabel"
+        >
+          {yAxisLabel}
+        </text>
+        <text x={width / 2} y={height - 5} textAnchor="middle" className="axisLabel">
+          {xAxisLabel}
+        </text>
+      </svg>
+      <div className="chartAxis">
+        <span>{sorted[0].year}</span>
+        <span>{sorted[sorted.length - 1].year}</span>
+      </div>
+      {footer && <div className="chartFooter">{footer}</div>}
     </div>
   )
 }

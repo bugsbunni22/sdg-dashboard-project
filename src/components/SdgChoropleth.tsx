@@ -31,6 +31,8 @@ type Props = {
   maxBoundsViscosity?: number;
   showBasemap?: boolean;
   dataKey?: string;
+  showCategoryControl?: boolean;
+  showResetButton?: boolean;
 };
 
 // 기본 팔레트 (8단계: 1칸은 배경, 7칸을 구간 색으로 사용)
@@ -323,6 +325,8 @@ export default function SdgChoropleth({
   maxBoundsViscosity = 1,
   showBasemap = true,
   dataKey,
+  showCategoryControl = true,
+  showResetButton = true,
 }: Props) {
   // 내부 카테고리 상태 (문자/숫자 모두 허용)
   const defaultYear = useMemo(() => {
@@ -405,10 +409,12 @@ export default function SdgChoropleth({
         )}
 
         <ZoomControl position="topleft" />
-        <ResetViewButton center={center} zoom={zoom} />
+        {showResetButton && <ResetViewButton center={center} zoom={zoom} />}
 
         {/* SDG 카테고리 선택 (문자 키) */}
-        <CategoryControl years={years} year={year} onChange={setYear} label="Category" />
+        {showCategoryControl && (
+          <CategoryControl years={years} year={year} onChange={setYear} label="Category" />
+        )}
 
         {/* Info & Legend */}
         <InfoControl

@@ -77,7 +77,7 @@ body,
 /* ✅ 본문: 왼쪽 지도, 오른쪽 패널 */
 .content {
   display: grid;
-  grid-template-columns: 1fr minmax(320px, 420px);
+  grid-template-columns: 1fr;
   gap: 16px;
   padding: 12px;
   box-sizing: border-box;
@@ -112,6 +112,156 @@ body,
 }
 .panel h3 {
   margin: 6px 0 8px;
+}
+
+.employmentContent {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.chartsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  margin-top: 12px;
+}
+.chartsGrid--triple {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.chartCard {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 12px;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.chartHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+.chartHeader h4 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+.chartStat {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-size: 0.85rem;
+  color: #475569;
+}
+.chartStatLabel {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.chartStatValue {
+  font-weight: 600;
+  color: #0f172a;
+}
+.chartAxis {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: #64748b;
+  margin-top: 4px;
+}
+.axisLabel {
+  font-size: 0.7rem;
+  fill: #475569;
+}
+.trendChart {
+  width: 100%;
+  height: auto;
+}
+.chartFooter {
+  font-size: 0.8rem;
+  color: #475569;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.chartMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.78rem;
+  color: #475569;
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin: 12px 0;
+}
+.statCard {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.statLabel {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  color: #6b7280;
+}
+.statValue {
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.segmented {
+  display: inline-flex;
+  border: 1px solid #cbd5f5;
+  border-radius: 999px;
+  overflow: hidden;
+  background: #fff;
+}
+.segmented button {
+  border: none;
+  background: transparent;
+  padding: 6px 14px;
+  font: inherit;
+  cursor: pointer;
+  color: #475569;
+}
+.segmented button.active {
+  background: #e0e7ff;
+  color: #1e40af;
+  font-weight: 600;
+}
+
+.tableWrap {
+  overflow-x: auto;
+}
+.dataTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+.dataTable th,
+.dataTable td {
+  text-align: left;
+  padding: 8px;
+  border-bottom: 1px solid #e2e8f0;
+}
+.dataTable th {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: #64748b;
 }
 
 /* ✅ 범례: 지도 오른쪽 아래에 띄우기 */
