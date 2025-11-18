@@ -16,6 +16,8 @@ body,
   display: grid;
   grid-template-rows: auto auto 1fr;
   grid-template-columns: 1fr;
+  padding: 0 32px;
+  box-sizing: border-box;
 }
 
 /* ✅ 상단 헤더 */
@@ -24,7 +26,7 @@ body,
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 12px 16px;
+  padding: 12px 0;
   border-bottom: 1px solid #eee;
   background: #fff;
 }
@@ -59,7 +61,7 @@ body,
   display: flex;
   gap: 12px;
   align-items: center;
-  padding: 10px 16px;
+  padding: 10px 0;
   border-bottom: 1px solid #eee;
   background: #fff;
 }
@@ -74,17 +76,17 @@ body,
   font-size: 0.9rem;
 }
 
-/* ✅ 본문: 왼쪽 지도, 오른쪽 패널 */
+/* 본문: 왼쪽 지도, 오른쪽 패널 */
 .content {
   display: grid;
   grid-template-columns: 1fr;
   gap: 16px;
-  padding: 12px;
+  padding: 20px 0 24px;
   box-sizing: border-box;
   min-height: 0;
 }
 
-/* ✅ 지도 영역 */
+/* 지도 영역 */
 .mapWrap {
   min-width: 0;
   position: relative; /* 레전드를 지도 위에 올리기 위해 */
@@ -101,7 +103,7 @@ body,
   outline: none;
 }
 
-/* ✅ 우측 패널 */
+/* 우측 패널 */
 .panel {
   border: 1px solid #eee;
   border-radius: 10px;
@@ -165,15 +167,13 @@ body,
   font-weight: 600;
   color: #0f172a;
 }
-.chartAxis {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.75rem;
-  color: #64748b;
-  margin-top: 4px;
-}
-.axisLabel {
+.axisLabelMajor {
   font-size: 0.7rem;
+  fill: #475569;
+  font-weight: 600;
+}
+.axisTickLabel {
+  font-size: 0.55rem;
   fill: #475569;
 }
 .trendChart {
@@ -264,7 +264,7 @@ body,
   color: #64748b;
 }
 
-/* ✅ 범례: 지도 오른쪽 아래에 띄우기 */
+/* 범례: 지도 오른쪽 아래에 띄우기 */
 .legend {
   position: absolute;
   right: 12px;
@@ -293,12 +293,12 @@ body,
   border-radius: 3px;
 }
 
-/* ✅ Leaflet 레이어/툴팁 z-index (포인트가 폴리곤 위로) */
+/* Leaflet 레이어/툴팁 z-index (포인트가 폴리곤 위로) */
 .leaflet-container .leaflet-tooltip {
   z-index: 500;
 }
 
-/* 📱 반응형: 900px 이하에서는 패널을 아래로 */
+/* 반응형: 900px 이하에서는 패널을 아래로 */
 @media (max-width: 900px) {
   .content {
     grid-template-columns: 1fr;
@@ -312,7 +312,7 @@ body,
   }
 }
 
-/* 📱 더 작은 화면: 툴바 요소가 겹치지 않게 줄바꿈 */
+/* 더 작은 화면: 툴바 요소가 겹치지 않게 줄바꿈 */
 @media (max-width: 600px) {
   .toolbar {
     flex-wrap: wrap;

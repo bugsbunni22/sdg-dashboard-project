@@ -257,11 +257,25 @@ export default function App() {
   }, [employmentFilterType, sdgOccupationSeries])
   const formatNumber = (value?: number) => {
     if (typeof value !== 'number' || !Number.isFinite(value)) return 'N/A'
-    return Math.round(value).toLocaleString()
+    const abs = Math.abs(value)
+    if (abs >= 1000) {
+      const shortened = value / 1000
+      const digits = abs >= 10000 ? 0 : 1
+      const formatted = shortened.toFixed(digits).replace(/\.0+$/, '')
+      return `${formatted}k`
+    }
+    return Math.round(value).toString()
   }
   const formatCurrency = (value?: number) => {
     if (typeof value !== 'number' || !Number.isFinite(value)) return 'N/A'
-    return `$${Math.round(value).toLocaleString()}`
+    const abs = Math.abs(value)
+    if (abs >= 1000) {
+      const shortened = value / 1000
+      const digits = abs >= 10000 ? 0 : 1
+      const formatted = shortened.toFixed(digits).replace(/\.0+$/, '')
+      return `$${formatted}k`
+    }
+    return `$${Math.round(value)}`
   }
 
   return (
@@ -466,6 +480,10 @@ export default function App() {
                           valueFormatter={formatNumber}
                           color="#2563eb"
                           yAxisLabel="Employment (people)"
+                          yTickStep={1000}
+                          xTickStep={5}
+                          yTickFormatter={formatNumber}
+                          statLabel="Latest employment"
                         />
                         <TrendChart
                           data={wageTrend}
@@ -473,6 +491,10 @@ export default function App() {
                           valueFormatter={formatCurrency}
                           color="#ea580c"
                           yAxisLabel="Annual Wage (USD)"
+                          yTickStep={5000}
+                          xTickStep={5}
+                          yTickFormatter={formatCurrency}
+                          statLabel="Latest wage"
                         />
                       </div>
                       <p className="muted">
@@ -540,6 +562,10 @@ export default function App() {
                         valueFormatter={formatNumber}
                         color="#2563eb"
                         yAxisLabel="Employment (people)"
+                        yTickStep={1000}
+                        xTickStep={5}
+                        yTickFormatter={formatNumber}
+                        statLabel="Latest employment"
                         footer={
                           <div className="chartMeta">
                             <span>Latest year: {latest?.year ?? 'N/A'}</span>
@@ -599,7 +625,11 @@ function TrendChart({
   yAxisLabel = 'Value',
   xAxisLabel = 'Year',
   statLabel = 'Latest',
-  footer
+  footer,
+  xTickStep = 5,
+  yTickStep,
+  xTickFormatter,
+  yTickFormatter
 }: {
   data: TrendPoint[]
   title: string
@@ -609,11 +639,31 @@ function TrendChart({
   xAxisLabel?: string
   statLabel?: string
   footer?: React.ReactNode
+  xTickStep?: number
+  yTickStep?: number
+  xTickFormatter?: (value: number) => string
+  yTickFormatter?: (value: number) => string
 }) {
+  const containerRef = React.useRef<HTMLDivElement | null>(null)
+  const [containerWidth, setContainerWidth] = React.useState(360)
+
+  React.useEffect(() => {
+    const node = containerRef.current
+    if (!node || typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver((entries) => {
+      const width = entries[0]?.contentRect?.width
+      if (Number.isFinite(width) && width > 0) {
+        setContainerWidth((prev) => (Math.abs(prev - width) > 1 ? width : prev))
+      }
+    })
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [])
+
   const sorted = React.useMemo(() => [...data].sort((a, b) => a.year - b.year), [data])
   if (!sorted.length) {
     return (
-      <div className="chartCard">
+      <div className="chartCard" ref={containerRef}>
         <div className="chartHeader">
           <h4>{title}</h4>
         </div>
@@ -622,12 +672,54 @@ function TrendChart({
     )
   }
 
-  const width = 360
-  const height = 160
-  const padding = 28
+  const width = Math.max(260, containerWidth - 20)
+  const height = Math.max(130, Math.min(220, width * 0.45))
+  const padding = 32
   const minValue = sorted.reduce((min, point) => Math.min(min, point.value), sorted[0].value)
   const maxValue = sorted.reduce((max, point) => Math.max(max, point.value), sorted[0].value)
   const valueRange = maxValue - minValue || 1
+  const minYear = sorted[0].year
+  const maxYear = sorted[sorted.length - 1].year
+  const yearRange = maxYear - minYear || 1
+
+  const computeResponsiveStep = (
+    base: number | undefined,
+    range: number,
+    pixelSpan: number,
+    minPixelGap: number
+  ) => {
+    if (!Number.isFinite(range) || range === 0) return 1
+    const safeRange = Math.abs(range)
+    let step =
+      base ??
+      Math.max(
+        1,
+        Math.round(safeRange / Math.max(2, Math.min(6, Math.floor(pixelSpan / minPixelGap))))
+      )
+    const approxTicks = safeRange / step
+    if (approxTicks > 0) {
+      const spacing = pixelSpan / approxTicks
+      if (spacing < minPixelGap) {
+        const factor = Math.ceil(minPixelGap / spacing)
+        step *= factor
+      }
+    }
+    return Math.max(1, Math.round(step))
+  }
+
+  const resolvedXStep = computeResponsiveStep(
+    xTickStep,
+    yearRange,
+    Math.max(60, width - padding * 2),
+    70
+  )
+  const resolvedYStep = computeResponsiveStep(
+    yTickStep,
+    valueRange,
+    Math.max(50, height - padding * 2),
+    45
+  )
+
   const lastValue = sorted[sorted.length - 1]?.value
   const formattedLastValue =
     Number.isFinite(lastValue) && valueFormatter
@@ -636,11 +728,11 @@ function TrendChart({
       ? Math.round(lastValue as number).toLocaleString()
       : 'N/A'
 
-  const coordinates = sorted.map((point, idx) => {
-    const ratio = sorted.length > 1 ? idx / (sorted.length - 1) : 0
-    const x = padding + ratio * (width - padding * 2)
-    const y =
-      height - padding - ((point.value - minValue) / valueRange) * (height - padding * 2)
+  const coordinates = sorted.map((point) => {
+    const xRatio = yearRange ? (point.year - minYear) / yearRange : 0
+    const yRatio = valueRange ? (point.value - minValue) / valueRange : 0
+    const x = padding + xRatio * (width - padding * 2)
+    const y = height - padding - yRatio * (height - padding * 2)
     return { x, y }
   })
 
@@ -648,8 +740,43 @@ function TrendChart({
     .map((coord, idx) => `${idx === 0 ? 'M' : 'L'} ${coord.x.toFixed(2)} ${coord.y.toFixed(2)}`)
     .join(' ')
 
+  const xTicks: number[] = []
+  if (Number.isFinite(minYear) && Number.isFinite(maxYear)) {
+    xTicks.push(minYear, maxYear)
+    if (resolvedXStep && resolvedXStep > 0) {
+      const start = Math.ceil(minYear / resolvedXStep) * resolvedXStep
+      for (let tick = start; tick <= maxYear; tick += resolvedXStep) {
+        if (tick !== minYear && tick !== maxYear) xTicks.push(tick)
+      }
+    }
+    xTicks.sort((a, b) => a - b)
+  }
+
+  const yTicks: number[] = []
+  if (Number.isFinite(minValue) && Number.isFinite(maxValue)) {
+    const step = resolvedYStep || 1
+    const start = Math.floor(minValue / step) * step
+    const end = Math.ceil(maxValue / step) * step
+    for (let tick = start; tick <= end; tick += step) {
+      yTicks.push(tick)
+    }
+    if (!yTicks.includes(minValue)) yTicks.push(minValue)
+    if (!yTicks.includes(maxValue)) yTicks.push(maxValue)
+    yTicks.sort((a, b) => a - b)
+  }
+
+  const resolveYLabel = (value: number) => {
+    if (yTickFormatter) return yTickFormatter(value)
+    if (valueFormatter) return valueFormatter(value)
+    return Math.round(value).toString()
+  }
+  const resolveXLabel = (value: number) => {
+    if (xTickFormatter) return xTickFormatter(value)
+    return String(value)
+  }
+
   return (
-    <div className="chartCard">
+    <div className="chartCard" ref={containerRef}>
       <div className="chartHeader">
         <h4>{title}</h4>
         <div className="chartStat">
@@ -667,23 +794,76 @@ function TrendChart({
         {coordinates.map((coord, idx) => (
           <circle key={idx} cx={coord.x} cy={coord.y} r={4} fill={color} opacity={0.8} />
         ))}
+        {yTicks.map((tick) => {
+          const ratio = valueRange ? (tick - minValue) / valueRange : 0
+          const y = height - padding - ratio * (height - padding * 2)
+          return (
+            <g key={`y-${tick}`}>
+              <line
+                x1={padding}
+                x2={width - padding}
+                y1={y}
+                y2={y}
+                stroke="#e2e8f0"
+                strokeWidth={1}
+                opacity={0.4}
+              />
+              <line
+                x1={padding - 6}
+                x2={padding}
+                y1={y}
+                y2={y}
+                stroke="#94a3b8"
+                strokeWidth={1}
+              />
+              <text
+                x={padding - 8}
+                y={y + 3}
+                textAnchor="end"
+                className="axisTickLabel"
+              >
+                {resolveYLabel(tick)}
+              </text>
+            </g>
+          )
+        })}
+        {xTicks.map((tick) => {
+          const ratio = yearRange ? (tick - minYear) / yearRange : 0
+          const x = padding + ratio * (width - padding * 2)
+          return (
+            <g key={`x-${tick}`}>
+              <line
+                x1={x}
+                x2={x}
+                y1={height - padding}
+                y2={height - padding + 6}
+                stroke="#94a3b8"
+                strokeWidth={1}
+              />
+              <text
+                x={x}
+                y={height - padding + 14}
+                textAnchor="middle"
+                className="axisTickLabel"
+              >
+                {resolveXLabel(tick)}
+              </text>
+            </g>
+          )
+        })}
         <text
-          x={12}
+          x={10}
           y={height / 2}
           textAnchor="middle"
-          transform={`rotate(-90 12 ${height / 2})`}
-          className="axisLabel"
+          transform={`rotate(-90 10 ${height / 2})`}
+          className="axisLabelMajor"
         >
           {yAxisLabel}
         </text>
-        <text x={width / 2} y={height - 5} textAnchor="middle" className="axisLabel">
+        <text x={width / 2} y={height - 2} textAnchor="middle" className="axisLabelMajor">
           {xAxisLabel}
         </text>
       </svg>
-      <div className="chartAxis">
-        <span>{sorted[0].year}</span>
-        <span>{sorted[sorted.length - 1].year}</span>
-      </div>
       {footer && <div className="chartFooter">{footer}</div>}
     </div>
   )
