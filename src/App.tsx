@@ -111,7 +111,7 @@ export default function App() {
   const [activeYear, setActiveYear] = React.useState<number>(MSA_AVAILABLE_YEARS.at(-1) ?? 2000)
   const [activeSdg, setActiveSdg] = React.useState('SDG-01')
   const [activeMsa, setActiveMsa] = React.useState<string | null>(null)
-  const [showLabels, setShowLabels] = React.useState(true)
+  const [showLabels] = React.useState(true)
   const [activeStateYear, setActiveStateYear] = React.useState<number>(STATE_AVAILABLE_YEARS.at(-1) ?? 2000)
   const [activeStateSdg, setActiveStateSdg] = React.useState('SDG-01')
   const [employmentFilterType, setEmploymentFilterType] = React.useState<'occupation' | 'sdg'>('occupation')
@@ -190,6 +190,32 @@ export default function App() {
     const ids = msaToCounties[msa] || []
     return new Set(ids)
   }, [msaToCounties, activeMsa])
+  const countyToMsa = React.useMemo(() => {
+    const out: Record<string, string> = {}
+    for (const [msa, ids] of Object.entries(msaToCounties)) {
+      for (const id of ids) {
+        const key = String(id)
+        if (!out[key]) out[key] = msa
+      }
+    }
+    return out
+  }, [msaToCounties])
+  const msaSdgChartData = React.useMemo(() => {
+    if (!activeMsa) return []
+    const rows = eung.filter((row) => row.area_name === activeMsa)
+    if (!rows.length) return []
+    const orderMap = new Map(sdgOptions.map((sdg, idx) => [sdg, idx]))
+    return [...rows]
+      .sort((a, b) => {
+        const ai = orderMap.get(a.sdg) ?? 999
+        const bi = orderMap.get(b.sdg) ?? 999
+        return ai - bi || a.sdg.localeCompare(b.sdg)
+      })
+      .map((row) => ({
+        label: row.sdg,
+        value: Number(row.sdg_lq ?? 0) || 0
+      }))
+  }, [activeMsa, eung, sdgOptions])
 
   const employmentSeries = React.useMemo(() => {
     if (employmentFilterType !== 'occupation') return []
@@ -321,9 +347,6 @@ export default function App() {
             </select>
 
             <div className="spacer" />
-
-            <label>Labels</label>
-            <input type="checkbox" checked={showLabels} onChange={(e) => setShowLabels(e.target.checked)} />
           </>
         )}
 
@@ -395,34 +418,57 @@ export default function App() {
 
       <div className="content">
         {activePage === 'msa' ? (
-          <div className="mapWrap">
-            <SdgChoropleth
-              dataKey="msa"
-              geojson={countyGeojson}
-              idProperty="GEOID"
-              data={metrics}
-              years={sdgOptions}
-              initialYear={activeSdg}
-              title={`${activeSdg} (SDG LQ, ${activeYear})`}
-              valueFormatter={(v) => (typeof v === 'number' ? v.toFixed(2) : String(v ?? ''))}
-              center={[37.8, -96]}
-              zoom={4}
-              maxBounds={CONTIGUOUS_US_BOUNDS}
-              maxBoundsViscosity={1}
-              showBasemap={false}
-              showCategoryControl={false}
-              showResetButton={false}
-            >
-              {showLabels && (
-                <CountyValueLabels
-                  geojson={countyGeojson}
-                  idProperty="GEOID"
-                  metrics={metrics}
-                  activeSdg={activeSdg}
-                  activeMsaCounties={activeCountySet}
+          <div className="mapWithSidebar">
+            <div className="mapWrap">
+              <SdgChoropleth
+                dataKey="msa"
+                geojson={countyGeojson}
+                idProperty="GEOID"
+                data={metrics}
+                years={sdgOptions}
+                initialYear={activeSdg}
+                title={`${activeSdg} (SDG LQ, ${activeYear})`}
+                valueFormatter={(v) => (typeof v === 'number' ? v.toFixed(2) : String(v ?? ''))}
+                center={[37.8, -96]}
+                zoom={4}
+                maxBounds={CONTIGUOUS_US_BOUNDS}
+                maxBoundsViscosity={1}
+                showBasemap={false}
+                showCategoryControl={false}
+                showResetButton={false}
+                onFeatureClick={(feature) => {
+                  const geoidValue = (feature as any)?.properties?.GEOID
+                  const nextMsa = geoidValue != null ? countyToMsa[String(geoidValue)] : undefined
+                  if (nextMsa) setActiveMsa(nextMsa)
+                }}
+              >
+                {showLabels && (
+                  <CountyValueLabels
+                    geojson={countyGeojson}
+                    idProperty="GEOID"
+                    metrics={metrics}
+                    activeSdg={activeSdg}
+                    activeMsaCounties={activeCountySet}
+                  />
+                )}
+              </SdgChoropleth>
+            </div>
+
+            <aside className="msaSidebar">
+              <h3>MSA Details</h3>
+              <p className="msaName">{activeMsa ?? 'Select an area on the map'}</p>
+              <div className="sidebarMeta">
+                <span>Year: {activeYear}</span>
+              </div>
+              <div className="sidebarChartWrap">
+                <h4>SDG LQ by category</h4>
+                <SdgBarChart
+                  data={msaSdgChartData}
+                  valueFormatter={(value) => value.toFixed(2)}
+                  emptyMessage="Click any highlighted area to see its SDG LQ distribution."
                 />
-              )}
-            </SdgChoropleth>
+              </div>
+            </aside>
           </div>
         ) : activePage === 'state' ? (
           <div className="mapWrap">
@@ -616,6 +662,7 @@ export default function App() {
 }
 
 type TrendPoint = { year: number; value: number }
+type BarDatum = { label: string; value: number }
 
 function TrendChart({
   data,
@@ -673,7 +720,7 @@ function TrendChart({
   }
 
   const width = Math.max(260, containerWidth - 20)
-  const height = Math.max(130, Math.min(220, width * 0.45))
+  const height = Math.max(130, Math.min(220, width * 0.65))
   const padding = 32
   const minValue = sorted.reduce((min, point) => Math.min(min, point.value), sorted[0].value)
   const maxValue = sorted.reduce((max, point) => Math.max(max, point.value), sorted[0].value)
@@ -865,6 +912,157 @@ function TrendChart({
         </text>
       </svg>
       {footer && <div className="chartFooter">{footer}</div>}
+    </div>
+  )
+}
+
+function SdgBarChart({
+  data,
+  valueFormatter,
+  emptyMessage = 'No SDG metrics available.'
+}: {
+  data: BarDatum[]
+  valueFormatter?: (value: number) => string
+  emptyMessage?: string
+}) {
+  const containerRef = React.useRef<HTMLDivElement | null>(null)
+  const [width, setWidth] = React.useState(320)
+
+  React.useEffect(() => {
+    const node = containerRef.current
+    if (!node || typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver((entries) => {
+      const w = entries[0]?.contentRect?.width
+      if (Number.isFinite(w) && w > 0) {
+        setWidth((prev) => (Math.abs(prev - w) > 1 ? w : prev))
+      }
+    })
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [])
+
+  if (!data?.length) {
+    return (
+      <div className="chartCard barChartCard" ref={containerRef}>
+        <p className="muted">{emptyMessage}</p>
+      </div>
+    )
+  }
+
+  const padding = { top: 24, right: 34, bottom: 48, left: 66 }
+  const chartWidth = Math.max(320, Math.min(480, width - 12))
+  const targetBand = 26
+  const targetGap = 12
+  const plotHeight = Math.max(180, data.length * (targetBand + targetGap))
+  const height = plotHeight + padding.top + padding.bottom
+  const plotWidth = Math.max(200, chartWidth - padding.left - padding.right)
+  const values = data.map((d) => d.value)
+  const maxValue = Math.max(0, ...values, 1)
+  const minValue = Math.min(0, ...values)
+  const range = maxValue - minValue || 1
+  const bandHeight = plotHeight / data.length
+  const barHeight = Math.max(10, bandHeight - targetGap)
+  const zeroLineX = padding.left + ((0 - minValue) / range) * plotWidth
+
+  const xTicks: number[] = []
+  const tickCount = Math.min(4, Math.max(2, Math.floor(plotWidth / 160)))
+  for (let i = 0; i <= tickCount; i++) {
+    const ratio = i / tickCount
+    const tickValue = minValue + ratio * range
+    xTicks.push(Number(tickValue.toFixed(2)))
+  }
+
+  const formatValue = (v: number) =>
+    valueFormatter ? valueFormatter(v) : Number.isFinite(v) ? v.toFixed(2) : '0'
+
+  return (
+    <div className="chartCard barChartCard" ref={containerRef}>
+      <svg viewBox={`0 0 ${chartWidth} ${height}`} role="img" aria-label="SDG LQ bar chart" className="barChartSvg">
+        {xTicks.map((tick) => {
+          const ratio = (tick - minValue) / range
+          const x = padding.left + ratio * plotWidth
+          return (
+            <g key={`bar-x-${tick}`}>
+              <line
+                x1={x}
+                x2={x}
+                y1={padding.top}
+                y2={padding.top + plotHeight}
+                stroke="#e2e8f0"
+                strokeWidth={1}
+                opacity={0.8}
+              />
+              <text
+                x={x}
+                y={padding.top + plotHeight + 20}
+                textAnchor="middle"
+                className="axisTickLabel"
+              >
+                {formatValue(tick)}
+              </text>
+            </g>
+          )
+        })}
+        <line
+          x1={zeroLineX}
+          x2={zeroLineX}
+          y1={padding.top}
+          y2={padding.top + plotHeight}
+          stroke="#94a3b8"
+          strokeWidth={1.5}
+        />
+        {data.map((datum, idx) => {
+          const valueRatio = (datum.value - minValue) / range
+          const valueX = padding.left + valueRatio * plotWidth
+          const barX = Math.min(valueX, zeroLineX)
+          const widthPx = Math.max(2, Math.abs(valueX - zeroLineX))
+          const y = padding.top + idx * bandHeight + (bandHeight - barHeight) / 2
+          const valueLabelX =
+            datum.value >= 0
+              ? Math.min(barX + widthPx + 8, padding.left + plotWidth + 36)
+              : Math.max(barX - 8, padding.left - 36)
+          const valueAnchor = datum.value >= 0 ? 'start' : 'end'
+          const labelY = y + barHeight / 2 + 5
+          return (
+            <g key={datum.label}>
+              <rect
+                x={barX}
+                y={y}
+                width={widthPx}
+                height={barHeight}
+                fill="#2563eb"
+                rx={3}
+                ry={3}
+              />
+              <g>
+                <text x={padding.left - 12} y={labelY} textAnchor="end" className="axisTickLabel">
+                  {datum.label}
+                </text>
+                <text x={valueLabelX} y={labelY} textAnchor={valueAnchor} className="axisTickLabel">
+                  {formatValue(datum.value)}
+                </text>
+              </g>
+            </g>
+          )
+        })}
+        <text
+          x={chartWidth / 2}
+          y={height - 6}
+          textAnchor="middle"
+          className="axisLabelMajor"
+        >
+          SDG LQ
+        </text>
+        <text
+          x={16}
+          y={padding.top + plotHeight / 2}
+          textAnchor="middle"
+          transform={`rotate(-90 16 ${padding.top + plotHeight / 2})`}
+          className="axisLabelMajor"
+        >
+          SDG
+        </text>
+      </svg>
     </div>
   )
 }

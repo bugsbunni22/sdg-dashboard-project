@@ -31,6 +31,7 @@ type Props = {
   maxBoundsViscosity?: number;
   showBasemap?: boolean;
   dataKey?: string;
+  onFeatureClick?: (feature: FeatureLike, idValue?: string | number) => void;
   showCategoryControl?: boolean;
   showResetButton?: boolean;
 };
@@ -327,6 +328,7 @@ export default function SdgChoropleth({
   dataKey,
   showCategoryControl = true,
   showResetButton = true,
+  onFeatureClick,
 }: Props) {
   // 내부 카테고리 상태 (문자/숫자 모두 허용)
   const defaultYear = useMemo(() => {
@@ -365,6 +367,7 @@ export default function SdgChoropleth({
       },
       click: () => {
         setSelected((prev) => (prev === feature ? null : feature));
+        onFeatureClick?.(feature, id);
       },
     });
 
@@ -427,19 +430,9 @@ export default function SdgChoropleth({
         />
         <Legend breaks={breaks} title={title} />
 
-        {/* Map 내부에서 자식 렌더 (useMap 사용 가능) */}
+        {/* Map ���� ���� (useMap ���� ��) */}
         {children}
       </MapContainer>
-
-      {/* 도움말 패널 (선택) */}
-      <div className="absolute right-3 bottom-3 z-[1000] bg-white/95 backdrop-blur rounded-xl shadow p-3 text-sm space-y-2">
-        <div className="font-semibold">Interactions</div>
-        <ul className="list-disc list-inside text-slate-700">
-          <li>Hover: highlight &amp; details</li>
-          <li>Click: lock selection</li>
-          <li>Use the selector to change category</li>
-        </ul>
-      </div>
     </div>
   );
 }
