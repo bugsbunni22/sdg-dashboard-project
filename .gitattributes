@@ -1,0 +1,2 @@
+src/data/remote_flag.json filter=lfs diff=lfs merge=lfs -text
+src/data/remote_flag_cl.json filter=lfs diff=lfs merge=lfs -text

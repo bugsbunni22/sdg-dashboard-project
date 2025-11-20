@@ -7,6 +7,7 @@ import countiesGeojsonRaw from './data/counties_500k.json'
 import statesGeojsonRaw from './data/usa_state_20m.json'
 import msaToCountiesRows from './data/msaTOcounties.json'
 import employmentRowsData from './data/emp_AnnualSalary.json'
+import remoteFlagRowsData from './data/remote_flag_cl.json'
 import { buildMsaToCountiesFromList } from './utils/crosswalk'
 
 type Row = { area_name: string; sdg: string; sdg_lq: number }
@@ -22,6 +23,10 @@ type EmploymentRow = {
   tot_emp: number
   annual_w: number
   sdg: string
+}
+type RemoteFlagRow = {
+  occ_title?: string | null
+  remote_flag?: string | null
 }
 type MapPage = 'msa' | 'state' | 'employment'
 
@@ -65,10 +70,76 @@ const employmentRows: EmploymentRow[] = (employmentRowsData as EmploymentRow[]) 
 const EMPLOYMENT_OCCUPATIONS = Array.from(new Set(employmentRows.map((row) => row.total_title))).sort((a, b) =>
   a.localeCompare(b)
 )
+
+// Parse SDG-like values into normalized SDG codes like "SDG-01".
+// Accepts strings like "SDG-1", "1;2", "SDG-01|SDG-02", etc.
+function parseSdgs(input?: string | null): string[] {
+  if (!input) return []
+  const raw = String(input).trim()
+  if (!raw) return []
+
+  // Split on common separators (whitespace, comma, semicolon, pipe, slash)
+  const parts = raw.split(/[\s,;|\/]+/).map((p) => p.trim()).filter(Boolean)
+  const codes = new Set<string>()
+
+  for (const part of parts) {
+    // Try to capture an explicit SDG token or a plain number
+    const m = part.toUpperCase().match(/SDG[-\s]?(\d{1,2})$/i) || part.match(/^(\d{1,2})$/)
+    if (m && m[1]) {
+      const n = Number(m[1])
+      if (Number.isFinite(n)) {
+        codes.add(`SDG-${String(n).padStart(2, '0')}`)
+      }
+    } else {
+      // As a fallback, look for any 1-2 digit numbers inside the token
+      const nums = part.match(/\d{1,2}/g)
+      if (nums) {
+        for (const nn of nums) {
+          const n = Number(nn)
+          if (Number.isFinite(n)) codes.add(`SDG-${String(n).padStart(2, '0')}`)
+        }
+      }
+    }
+  }
+
+  return Array.from(codes)
+}
+
+function toStateId(raw?: string | number | null): string {
+  if (raw == null) return ''
+  const num = Number(raw)
+  if (Number.isFinite(num)) return String(num).padStart(2, '0')
+  return String(raw).padStart(2, '0')
+}
+
 const STANDARD_SDG_CODES = Array.from({ length: 16 }, (_, i) => `SDG-${String(i + 1).padStart(2, '0')}`)
-const EMPLOYMENT_SDGS = STANDARD_SDG_CODES.filter((code) =>
-  employmentRows.some((row) => row.sdg === code)
-)
+const EMPLOYMENT_SDGS = Array.from(
+  new Set(
+    STANDARD_SDG_CODES.filter((code) =>
+      employmentRows.some((row) => parseSdgs(row.sdg).includes(code))
+    )
+  )
+).sort((a, b) => a.localeCompare(b))
+const REMOTE_FLAG_BY_OCCUPATION: Record<string, string> = (() => {
+  const normalize = (flag: string) => {
+    const value = flag.trim()
+    if (!value) return ''
+    const lower = value.toLowerCase()
+    if (lower.includes('impossible') || lower.includes('no')) return 'Remote not possible'
+    return 'Remote possible'
+  }
+  const map = new Map<string, string>()
+  for (const row of remoteFlagRowsData as RemoteFlagRow[]) {
+    const title = row.occ_title?.trim()
+    if (!title) continue
+    const label = row.remote_flag ? normalize(row.remote_flag) : ''
+    if (!label) continue
+    map.set(title, label)
+  }
+  return Object.fromEntries(map.entries())
+})()
+const remoteLabelForOccupation = (title?: string | null) =>
+  title ? REMOTE_FLAG_BY_OCCUPATION[title.trim()] ?? 'Not specified' : 'Not specified'
 const MAP_TABS: { id: MapPage; label: string }[] = [
   { id: 'msa', label: 'MSA Map' },
   { id: 'state', label: 'State Map' },
@@ -114,6 +185,7 @@ export default function App() {
   const [showLabels] = React.useState(true)
   const [activeStateYear, setActiveStateYear] = React.useState<number>(STATE_AVAILABLE_YEARS.at(-1) ?? 2000)
   const [activeStateSdg, setActiveStateSdg] = React.useState('SDG-01')
+  const [activeStateId, setActiveStateId] = React.useState<string | null>(null)
   const [employmentFilterType, setEmploymentFilterType] = React.useState<'occupation' | 'sdg'>('occupation')
   const [activeEmploymentOccupation, setActiveEmploymentOccupation] = React.useState<string>(EMPLOYMENT_OCCUPATIONS[0] ?? '')
   const [activeEmploymentSdg, setActiveEmploymentSdg] = React.useState<string>(EMPLOYMENT_SDGS[0] ?? '')
@@ -129,6 +201,26 @@ export default function App() {
 
   const eung: EungMsa = React.useMemo(() => allYearsData[activeYear] ?? [], [activeYear])
   const stateEung: StateEung = React.useMemo(() => allStateYearsData[activeStateYear] ?? [], [activeStateYear])
+  const stateIdToName = React.useMemo(() => {
+    const out: Record<string, string> = {}
+    for (const row of stateEung) {
+      const id = toStateId(row.state_num)
+      if (!id) continue
+      if (!out[id]) out[id] = row.state_name ?? id
+    }
+    return out
+  }, [stateEung])
+
+  React.useEffect(() => {
+    if (!stateEung.length) {
+      setActiveStateId(null)
+      return
+    }
+    setActiveStateId((prev) => {
+      if (prev && stateEung.some((row) => toStateId(row.state_num) === prev)) return prev
+      return toStateId(stateEung[0].state_num)
+    })
+  }, [stateEung])
 
   // Crosswalk: MSA Title -> list of county GEOIDs
   const msaToCounties = React.useMemo(() => {
@@ -216,6 +308,24 @@ export default function App() {
         value: Number(row.sdg_lq ?? 0) || 0
       }))
   }, [activeMsa, eung, sdgOptions])
+  const stateSdgChartData = React.useMemo(() => {
+    if (!activeStateId) return []
+    const rows = stateEung.filter((row) => toStateId(row.state_num) === activeStateId)
+    if (!rows.length) return []
+    const orderMap = new Map(stateSdgOptions.map((sdg, idx) => [sdg, idx]))
+    return rows
+      .slice()
+      .sort((a, b) => {
+        const ai = orderMap.get(a.sdg) ?? 999
+        const bi = orderMap.get(b.sdg) ?? 999
+        return ai - bi || a.sdg.localeCompare(b.sdg)
+      })
+      .map((row) => ({
+        label: row.sdg,
+        value: Number(row.sdg_lq ?? 0) || 0
+      }))
+  }, [activeStateId, stateEung, stateSdgOptions])
+  const activeStateName = activeStateId ? stateIdToName[activeStateId] ?? activeStateId : null
 
   const employmentSeries = React.useMemo(() => {
     if (employmentFilterType !== 'occupation') return []
@@ -248,8 +358,16 @@ export default function App() {
     [employmentSeries]
   )
   const employmentSummaryTitle = employmentSelection?.total_title ?? activeEmploymentOccupation ?? 'Occupation'
-  const employmentSummaryContext = employmentSelection?.sdg ?? 'SDG N/A'
+  const employmentSummaryContext =
+    employmentFilterType === 'occupation'
+      ? employmentSelection?.sdg ?? 'SDG N/A'
+      : activeEmploymentSdg === 'all'
+      ? 'All SDGs'
+      : activeEmploymentSdg
   const employmentSummaryYear = employmentSelection?.year
+  const occupationRemoteLabel = remoteLabelForOccupation(
+    employmentSelection?.total_title ?? activeEmploymentOccupation
+  )
   const sdgOccupationSeries = React.useMemo(() => {
     if (employmentFilterType !== 'sdg') return []
     const grouped = new Map<string, EmploymentRow[]>()
@@ -471,24 +589,46 @@ export default function App() {
             </aside>
           </div>
         ) : activePage === 'state' ? (
-          <div className="mapWrap">
-            <SdgChoropleth
-              dataKey="state"
-              geojson={stateGeojson}
-              idProperty="STATE"
-              data={stateMetrics}
-              years={stateSdgOptions}
-              initialYear={activeStateSdg}
-              title={`${activeStateSdg} (State SDG LQ, ${activeStateYear})`}
-              valueFormatter={(v) => (typeof v === 'number' ? v.toFixed(2) : String(v ?? ''))}
-              center={[37.8, -96]}
-              zoom={4}
-              maxBounds={CONTIGUOUS_US_BOUNDS}
-              maxBoundsViscosity={1}
-              showBasemap={false}
-              showCategoryControl={false}
-              showResetButton={false}
-            />
+          <div className="mapWithSidebar">
+            <div className="mapWrap">
+              <SdgChoropleth
+                dataKey="state"
+                geojson={stateGeojson}
+                idProperty="STATE"
+                data={stateMetrics}
+                years={stateSdgOptions}
+                initialYear={activeStateSdg}
+                title={`${activeStateSdg} (State SDG LQ, ${activeStateYear})`}
+                valueFormatter={(v) => (typeof v === 'number' ? v.toFixed(2) : String(v ?? ''))}
+                center={[37.8, -96]}
+                zoom={4}
+                maxBounds={CONTIGUOUS_US_BOUNDS}
+                maxBoundsViscosity={1}
+                showBasemap={false}
+                showCategoryControl={false}
+                showResetButton={false}
+                onFeatureClick={(feature) => {
+                  const stateId = toStateId((feature as any)?.properties?.STATE)
+                  if (stateId) setActiveStateId(stateId)
+                }}
+              />
+            </div>
+
+            <aside className="msaSidebar">
+              <h3>State Details</h3>
+              <p className="msaName">{activeStateName ?? 'Select a state on the map'}</p>
+              <div className="sidebarMeta">
+                <span>Year: {activeStateYear}</span>
+              </div>
+              <div className="sidebarChartWrap">
+                <h4>SDG LQ by category</h4>
+                <SdgBarChart
+                  data={stateSdgChartData}
+                  valueFormatter={(value) => value.toFixed(2)}
+                  emptyMessage="Click any state to see its SDG LQ distribution."
+                />
+              </div>
+            </aside>
           </div>
         ) : (
           <div className="employmentContent">
@@ -519,6 +659,7 @@ export default function App() {
                           <small>average yearly pay</small>
                         </div>
                       </div>
+                      <p className="muted">Remote work: {occupationRemoteLabel}</p>
                       <div className="chartsGrid chartsGrid--triple">
                         <TrendChart
                           data={employmentTrend}
@@ -634,6 +775,7 @@ export default function App() {
                             <th>Year</th>
                             <th>Employment</th>
                             <th>Annual Wage</th>
+                            <th>Remote</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -643,6 +785,7 @@ export default function App() {
                               <td>{row.year}</td>
                               <td>{formatNumber(row.tot_emp)}</td>
                               <td>{formatCurrency(row.annual_w)}</td>
+                              <td>{remoteLabelForOccupation(row.title)}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -1017,8 +1160,7 @@ function SdgBarChart({
           const barX = Math.min(valueX, zeroLineX)
           const widthPx = Math.max(2, Math.abs(valueX - zeroLineX))
           const y = padding.top + idx * bandHeight + (bandHeight - barHeight) / 2
-          const valueLabelX =
-            datum.value >= 0
+          const valueLabelX = datum.value >= 0
               ? Math.min(barX + widthPx + 8, padding.left + plotWidth + 36)
               : Math.max(barX - 8, padding.left - 36)
           const valueAnchor = datum.value >= 0 ? 'start' : 'end'
