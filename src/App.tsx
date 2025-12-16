@@ -7,7 +7,6 @@ import countiesGeojsonRaw from './data/counties_500k.json'
 import statesGeojsonRaw from './data/usa_state_20m.json'
 import msaToCountiesRows from './data/msaTOcounties.json'
 import employmentRowsData from './data/emp_AnnualSalary.json'
-import remoteFlagRowsData from './data/remote_flag_cl.json'
 import { buildMsaToCountiesFromList } from './utils/crosswalk'
 
 type Row = { area_name: string; sdg: string; sdg_lq: number }
@@ -24,10 +23,13 @@ type EmploymentRow = {
   annual_w: number
   sdg: string
 }
+// App.tsx 상단 import에 useEffect/useMemo/useState는 React로 이미 쓰고 있으니 그대로 OK
+
 type RemoteFlagRow = {
   occ_title?: string | null
   remote_flag?: string | null
 }
+
 type MapPage = 'msa' | 'state' | 'employment'
 
 function sortSdgKeys(keys: string[]) {
@@ -122,13 +124,13 @@ const EMPLOYMENT_SDGS = Array.from(
 ).sort((a, b) => a.localeCompare(b))
 const normalizeOccupationTitle = (title?: string | null) =>
   (title ?? '')
-    .replace(/\*+$/, '') // strip trailing asterisks used in some titles
-    .replace(/\s*\([^)]*\)\s*$/, '') // remove trailing parenthetical markers like (##)
+    .replace(/\*+$/, '')
+    .replace(/\s*\([^)]*\)\s*$/, '')
     .replace(/\s+/g, ' ')
     .trim()
     .toLowerCase()
 
-const REMOTE_FLAG_BY_OCCUPATION: Record<string, string> = (() => {
+function buildRemoteFlagLookup(rows: RemoteFlagRow[]): Record<string, string> {
   const normalizeFlag = (flag: string) => {
     const value = flag.trim()
     if (!value) return ''
@@ -137,7 +139,7 @@ const REMOTE_FLAG_BY_OCCUPATION: Record<string, string> = (() => {
     return 'Remote possible'
   }
   const map = new Map<string, string>()
-  for (const row of remoteFlagRowsData as RemoteFlagRow[]) {
+  for (const row of rows) {
     const normalizedTitle = normalizeOccupationTitle(row.occ_title)
     if (!normalizedTitle) continue
     const label = row.remote_flag ? normalizeFlag(row.remote_flag) : ''
@@ -145,11 +147,8 @@ const REMOTE_FLAG_BY_OCCUPATION: Record<string, string> = (() => {
     map.set(normalizedTitle, label)
   }
   return Object.fromEntries(map.entries())
-})()
-const remoteLabelForOccupation = (title?: string | null) => {
-  const normalized = normalizeOccupationTitle(title)
-  return normalized ? REMOTE_FLAG_BY_OCCUPATION[normalized] ?? 'Not specified' : 'Not specified'
 }
+
 const MAP_TABS: { id: MapPage; label: string }[] = [
   { id: 'msa', label: 'MSA Map' },
   { id: 'state', label: 'State Map' },
@@ -200,6 +199,37 @@ export default function App() {
   const [activeEmploymentOccupation, setActiveEmploymentOccupation] = React.useState<string>(EMPLOYMENT_OCCUPATIONS[0] ?? '')
   const [activeEmploymentSdg, setActiveEmploymentSdg] = React.useState<string>(EMPLOYMENT_SDGS[0] ?? '')
   const [activeEmploymentYear, setActiveEmploymentYear] = React.useState<number | null>(null)
+  const [remoteFlagRows, setRemoteFlagRows] = React.useState<RemoteFlagRow[] | null>(null)
+
+  React.useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch('/data/remote_flag_cl.json')
+        if (!res.ok) throw new Error(`remote_flag_cl.json fetch failed: ${res.status}`)
+        const json = (await res.json()) as RemoteFlagRow[]
+        if (!cancelled) setRemoteFlagRows(json)
+      } catch (error) {
+        console.error(error)
+        if (!cancelled) setRemoteFlagRows([])
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const remoteFlagByOccupation = React.useMemo(
+    () => buildRemoteFlagLookup(remoteFlagRows ?? []),
+    [remoteFlagRows]
+  )
+  const remoteLabelForOccupation = React.useCallback(
+    (title?: string | null) => {
+      const normalized = normalizeOccupationTitle(title)
+      return normalized ? remoteFlagByOccupation[normalized] ?? 'Not specified' : 'Not specified'
+    },
+    [remoteFlagByOccupation]
+  )
 
   React.useEffect(() => {
     if (employmentFilterType === 'occupation' && !activeEmploymentOccupation && EMPLOYMENT_OCCUPATIONS[0]) {
@@ -1253,5 +1283,5 @@ function SdgBarChart({
         </text>
       </svg>
     </div>
-  )
-}
+    )
+  }
