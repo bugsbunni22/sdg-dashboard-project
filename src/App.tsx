@@ -120,8 +120,16 @@ const EMPLOYMENT_SDGS = Array.from(
     )
   )
 ).sort((a, b) => a.localeCompare(b))
+const normalizeOccupationTitle = (title?: string | null) =>
+  (title ?? '')
+    .replace(/\*+$/, '') // strip trailing asterisks used in some titles
+    .replace(/\s*\([^)]*\)\s*$/, '') // remove trailing parenthetical markers like (##)
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase()
+
 const REMOTE_FLAG_BY_OCCUPATION: Record<string, string> = (() => {
-  const normalize = (flag: string) => {
+  const normalizeFlag = (flag: string) => {
     const value = flag.trim()
     if (!value) return ''
     const lower = value.toLowerCase()
@@ -130,16 +138,18 @@ const REMOTE_FLAG_BY_OCCUPATION: Record<string, string> = (() => {
   }
   const map = new Map<string, string>()
   for (const row of remoteFlagRowsData as RemoteFlagRow[]) {
-    const title = row.occ_title?.trim()
-    if (!title) continue
-    const label = row.remote_flag ? normalize(row.remote_flag) : ''
+    const normalizedTitle = normalizeOccupationTitle(row.occ_title)
+    if (!normalizedTitle) continue
+    const label = row.remote_flag ? normalizeFlag(row.remote_flag) : ''
     if (!label) continue
-    map.set(title, label)
+    map.set(normalizedTitle, label)
   }
   return Object.fromEntries(map.entries())
 })()
-const remoteLabelForOccupation = (title?: string | null) =>
-  title ? REMOTE_FLAG_BY_OCCUPATION[title.trim()] ?? 'Not specified' : 'Not specified'
+const remoteLabelForOccupation = (title?: string | null) => {
+  const normalized = normalizeOccupationTitle(title)
+  return normalized ? REMOTE_FLAG_BY_OCCUPATION[normalized] ?? 'Not specified' : 'Not specified'
+}
 const MAP_TABS: { id: MapPage; label: string }[] = [
   { id: 'msa', label: 'MSA Map' },
   { id: 'state', label: 'State Map' },
@@ -189,6 +199,7 @@ export default function App() {
   const [employmentFilterType, setEmploymentFilterType] = React.useState<'occupation' | 'sdg'>('occupation')
   const [activeEmploymentOccupation, setActiveEmploymentOccupation] = React.useState<string>(EMPLOYMENT_OCCUPATIONS[0] ?? '')
   const [activeEmploymentSdg, setActiveEmploymentSdg] = React.useState<string>(EMPLOYMENT_SDGS[0] ?? '')
+  const [activeEmploymentYear, setActiveEmploymentYear] = React.useState<number | null>(null)
 
   React.useEffect(() => {
     if (employmentFilterType === 'occupation' && !activeEmploymentOccupation && EMPLOYMENT_OCCUPATIONS[0]) {
@@ -381,24 +392,45 @@ export default function App() {
       .map(([title, rows]) => ({ title, rows: rows.sort((a, b) => a.year - b.year) }))
       .sort((a, b) => a.title.localeCompare(b.title))
   }, [employmentFilterType, activeEmploymentSdg])
+  const sdgAvailableYears = React.useMemo(() => {
+    if (employmentFilterType !== 'sdg') return []
+    const years = new Set<number>()
+    for (const { rows } of sdgOccupationSeries) {
+      for (const row of rows) {
+        if (Number.isFinite(row.year)) years.add(row.year)
+      }
+    }
+    return Array.from(years).sort((a, b) => b - a)
+  }, [employmentFilterType, sdgOccupationSeries])
+  React.useEffect(() => {
+    if (employmentFilterType !== 'sdg') {
+      setActiveEmploymentYear(null)
+      return
+    }
+    setActiveEmploymentYear((prev) => {
+      if (prev && sdgAvailableYears.includes(prev)) return prev
+      return sdgAvailableYears[0] ?? null
+    })
+  }, [employmentFilterType, sdgAvailableYears])
   const sdgLatestRows = React.useMemo(() => {
     if (employmentFilterType !== 'sdg') return []
+    const targetYear = activeEmploymentYear
     return sdgOccupationSeries
       .map(({ title, rows }) => {
-        const latest = rows.at(-1)
-        return latest
+        const selected = targetYear ? rows.find((row) => row.year === targetYear) ?? rows.at(-1) : rows.at(-1)
+        return selected
           ? {
               title,
-              sdg: latest.sdg,
-              year: latest.year,
-              tot_emp: latest.tot_emp,
-              annual_w: latest.annual_w
+              sdg: selected.sdg,
+              year: selected.year,
+              tot_emp: selected.tot_emp,
+              annual_w: selected.annual_w
             }
           : null
       })
       .filter((row): row is { title: string; sdg: string; year: number; tot_emp: number; annual_w: number } => Boolean(row))
       .sort((a, b) => Number(b.tot_emp ?? 0) - Number(a.tot_emp ?? 0))
-  }, [employmentFilterType, sdgOccupationSeries])
+  }, [employmentFilterType, sdgOccupationSeries, activeEmploymentYear])
   const formatNumber = (value?: number) => {
     if (typeof value !== 'number' || !Number.isFinite(value)) return 'N/A'
     const abs = Math.abs(value)
@@ -765,7 +797,22 @@ export default function App() {
                 </div>
 
                 <div className="panel">
-                  <h3>{activeEmploymentSdg} Occupation Statistics</h3>
+                  <div className="panelHeader">
+                    <h3>{activeEmploymentSdg} Occupation Statistics</h3>
+                    {sdgAvailableYears.length > 0 && (
+                      <label className="inlineControl">
+                        <span>Year</span>
+                        <select
+                          value={activeEmploymentYear ?? sdgAvailableYears[0]}
+                          onChange={(e) => setActiveEmploymentYear(Number(e.target.value))}
+                        >
+                          {sdgAvailableYears.map((year) => (
+                            <option key={year} value={year}>{year}</option>
+                          ))}
+                        </select>
+                      </label>
+                    )}
+                  </div>
                   {sdgLatestRows.length ? (
                     <div className="tableWrap">
                       <table className="dataTable">
