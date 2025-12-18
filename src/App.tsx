@@ -8,6 +8,7 @@ import statesGeojsonRaw from './data/usa_state_20m.json'
 import msaToCountiesRows from './data/msaTOcounties.json'
 import employmentRowsData from './data/emp_AnnualSalary.json'
 import { buildMsaToCountiesFromList } from './utils/crosswalk'
+import { buildRemoteFlagLookup, normalizeOccupationTitle, type RemoteFlagRow } from './utils/remoteFlag'
 
 type Row = { area_name: string; sdg: string; sdg_lq: number }
 type EungMsa = Row[]
@@ -22,12 +23,6 @@ type EmploymentRow = {
   tot_emp: number
   annual_w: number
   sdg: string
-}
-// App.tsx 상단 import에 useEffect/useMemo/useState는 React로 이미 쓰고 있으니 그대로 OK
-
-type RemoteFlagRow = {
-  occ_title?: string | null
-  remote_flag?: string | null
 }
 
 type MapPage = 'msa' | 'state' | 'employment'
@@ -69,9 +64,6 @@ const allStateYearsData: Record<number, StateEung> = Object.fromEntries(
 const MSA_AVAILABLE_YEARS = Object.keys(allYearsData).map(Number).sort((a, b) => a - b)
 const STATE_AVAILABLE_YEARS = Object.keys(allStateYearsData).map(Number).sort((a, b) => a - b)
 const employmentRows: EmploymentRow[] = (employmentRowsData as EmploymentRow[]) ?? []
-const EMPLOYMENT_OCCUPATIONS = Array.from(new Set(employmentRows.map((row) => row.total_title))).sort((a, b) =>
-  a.localeCompare(b)
-)
 
 // Parse SDG-like values into normalized SDG codes like "SDG-01".
 // Accepts strings like "SDG-1", "1;2", "SDG-01|SDG-02", etc.
@@ -122,32 +114,41 @@ const EMPLOYMENT_SDGS = Array.from(
     )
   )
 ).sort((a, b) => a.localeCompare(b))
-const normalizeOccupationTitle = (title?: string | null) =>
-  (title ?? '')
-    .replace(/\*+$/, '')
-    .replace(/\s*\([^)]*\)\s*$/, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .toLowerCase()
 
-function buildRemoteFlagLookup(rows: RemoteFlagRow[]): Record<string, string> {
-  const normalizeFlag = (flag: string) => {
-    const value = flag.trim()
-    if (!value) return ''
-    const lower = value.toLowerCase()
-    if (lower.includes('impossible') || lower.includes('no')) return 'Remote not possible'
-    return 'Remote possible'
+const getSdgOptions = (rows?: { sdg: string }[]) =>
+  sortSdgKeys(Array.from(new Set(rows?.map((r) => r.sdg) ?? [])))
+
+const buildCountyMetrics = (eung: EungMsa, msaToCounties: Record<string, string[]>): MetricsByCounty => {
+  const out: MetricsByCounty = {}
+  for (const { area_name, sdg, sdg_lq } of eung) {
+    const msa = String(area_name).trim()
+    const geoids = msaToCounties[msa] || []
+    for (const gid of geoids) {
+      ;(out[gid] ??= {})[sdg] = Number(sdg_lq)
+    }
   }
-  const map = new Map<string, string>()
-  for (const row of rows) {
-    const normalizedTitle = normalizeOccupationTitle(row.occ_title)
-    if (!normalizedTitle) continue
-    const label = row.remote_flag ? normalizeFlag(row.remote_flag) : ''
-    if (!label) continue
-    map.set(normalizedTitle, label)
-  }
-  return Object.fromEntries(map.entries())
+  return out
 }
+
+const buildStateMetrics = (rows: StateEung): MetricsByState => {
+  const out: MetricsByState = {}
+  for (const { state_num, sdg, sdg_lq } of rows) {
+    const stateId = String(state_num ?? '').padStart(2, '0')
+    if (!stateId.trim()) continue
+    ;(out[stateId] ??= {})[sdg] = Number(sdg_lq)
+  }
+  return out
+}
+
+const buildTrendSeries = (rows: EmploymentRow[], key: 'tot_emp' | 'annual_w') =>
+  rows
+    .map((row) => ({ year: row.year, value: row[key] }))
+    .filter((point) => Number.isFinite(point.value))
+
+const getEmploymentOptions = (rows: EmploymentRow[]) =>
+  Array.from(new Set(rows.map((row) => row.total_title))).sort((a, b) => a.localeCompare(b))
+
+const EMPLOYMENT_OCCUPATIONS = getEmploymentOptions(employmentRows)
 
 const MAP_TABS: { id: MapPage; label: string }[] = [
   { id: 'msa', label: 'MSA Map' },
@@ -205,7 +206,7 @@ export default function App() {
     let cancelled = false
     ;(async () => {
       try {
-        const res = await fetch('/data/remote_flag_cl.json')
+        const res = await fetch(`${import.meta.env.BASE_URL}data/remote_flag_cl.json`)
         if (!res.ok) throw new Error(`remote_flag_cl.json fetch failed: ${res.status}`)
         const json = (await res.json()) as RemoteFlagRow[]
         if (!cancelled) setRemoteFlagRows(json)
@@ -274,18 +275,12 @@ export default function App() {
     }
   }, [])
 
-  const sdgOptions = React.useMemo(
-    () => sortSdgKeys(Array.from(new Set(eung?.map(r => r.sdg) ?? []))),
-    [eung]
-  )
+  const sdgOptions = React.useMemo(() => getSdgOptions(eung), [eung])
   const msaOptions = React.useMemo(
     () => Array.from(new Set(eung?.map(r => r.area_name) ?? [])).sort(),
     [eung]
   )
-  const stateSdgOptions = React.useMemo(
-    () => sortSdgKeys(Array.from(new Set(stateEung?.map(r => r.sdg) ?? []))),
-    [stateEung]
-  )
+  const stateSdgOptions = React.useMemo(() => getSdgOptions(stateEung), [stateEung])
 
   // Initialize SDG/MSA when year changes
   React.useEffect(() => {
@@ -297,26 +292,14 @@ export default function App() {
   }, [stateEung])
 
   // Build county-level metrics from MSA rows via crosswalk
-  const metrics: MetricsByCounty = React.useMemo(() => {
-    const out: MetricsByCounty = {}
-    for (const { area_name, sdg, sdg_lq } of eung) {
-      const msa = String(area_name).trim()
-      const geoids = msaToCounties[msa] || []
-      for (const gid of geoids) {
-        ;(out[gid] ??= {})[sdg] = Number(sdg_lq)
-      }
-    }
-    return out
-  }, [eung, msaToCounties])
-  const stateMetrics: MetricsByState = React.useMemo(() => {
-    const out: MetricsByState = {}
-    for (const { state_num, sdg, sdg_lq } of stateEung) {
-      const stateId = String(state_num ?? '').padStart(2, '0')
-      if (!stateId.trim()) continue
-      ;(out[stateId] ??= {})[sdg] = Number(sdg_lq)
-    }
-    return out
-  }, [stateEung])
+  const metrics: MetricsByCounty = React.useMemo(
+    () => buildCountyMetrics(eung, msaToCounties),
+    [eung, msaToCounties]
+  )
+  const stateMetrics: MetricsByState = React.useMemo(
+    () => buildStateMetrics(stateEung),
+    [stateEung]
+  )
 
   const activeCountySet = React.useMemo(() => {
     const msa = (activeMsa ?? '').trim()
@@ -385,17 +368,11 @@ export default function App() {
     [employmentFilterType, employmentSeries]
   )
   const employmentTrend = React.useMemo(
-    () =>
-      employmentSeries
-        .map((row) => ({ year: row.year, value: row.tot_emp }))
-        .filter((point) => Number.isFinite(point.value)),
+    () => buildTrendSeries(employmentSeries, 'tot_emp'),
     [employmentSeries]
   )
   const wageTrend = React.useMemo(
-    () =>
-      employmentSeries
-        .map((row) => ({ year: row.year, value: row.annual_w }))
-        .filter((point) => Number.isFinite(point.value)),
+    () => buildTrendSeries(employmentSeries, 'annual_w'),
     [employmentSeries]
   )
   const employmentSummaryTitle = employmentSelection?.total_title ?? activeEmploymentOccupation ?? 'Occupation'
@@ -505,26 +482,26 @@ export default function App() {
       <div className="toolbar">
         {activePage === 'msa' && (
           <>
-            <label>Year</label>
-            <select value={activeYear} onChange={(e) => setActiveYear(Number(e.target.value))}>
-              {MSA_AVAILABLE_YEARS.map((y) => (
-                <option key={y} value={y}>{y}</option>
-              ))}
-            </select>
+            <SelectControl
+              label="Year"
+              value={String(activeYear)}
+              onChange={(val) => setActiveYear(Number(val))}
+              options={MSA_AVAILABLE_YEARS.map((y) => ({ value: String(y), label: String(y) }))}
+            />
 
-            <label>SDG</label>
-            <select value={activeSdg} onChange={(e) => setActiveSdg(e.target.value)}>
-              {sdgOptions.map((s) => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
+            <SelectControl
+              label="SDG"
+              value={activeSdg}
+              onChange={setActiveSdg}
+              options={sdgOptions.map((s) => ({ value: s, label: s }))}
+            />
 
-            <label>Area</label>
-            <select value={activeMsa ?? ''} onChange={(e) => setActiveMsa(e.target.value)}>
-              {msaOptions.map((m) => (
-                <option key={m} value={m}>{m}</option>
-              ))}
-            </select>
+            <SelectControl
+              label="Area"
+              value={activeMsa ?? ''}
+              onChange={setActiveMsa}
+              options={msaOptions.map((m) => ({ value: m, label: m }))}
+            />
 
             <div className="spacer" />
           </>
@@ -532,19 +509,19 @@ export default function App() {
 
         {activePage === 'state' && (
           <>
-            <label>Year</label>
-            <select value={activeStateYear} onChange={(e) => setActiveStateYear(Number(e.target.value))}>
-              {STATE_AVAILABLE_YEARS.map((y) => (
-                <option key={y} value={y}>{y}</option>
-              ))}
-            </select>
+            <SelectControl
+              label="Year"
+              value={String(activeStateYear)}
+              onChange={(val) => setActiveStateYear(Number(val))}
+              options={STATE_AVAILABLE_YEARS.map((y) => ({ value: String(y), label: String(y) }))}
+            />
 
-            <label>SDG</label>
-            <select value={activeStateSdg} onChange={(e) => setActiveStateSdg(e.target.value)}>
-              {stateSdgOptions.map((s) => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
+            <SelectControl
+              label="SDG"
+              value={activeStateSdg}
+              onChange={setActiveStateSdg}
+              options={stateSdgOptions.map((s) => ({ value: s, label: s }))}
+            />
 
             <div className="spacer" />
             <span>State-level overview</span>
@@ -572,21 +549,21 @@ export default function App() {
 
             {employmentFilterType === 'occupation' ? (
               <>
-                <label>Occupation</label>
-                <select value={activeEmploymentOccupation} onChange={(e) => setActiveEmploymentOccupation(e.target.value)}>
-                  {EMPLOYMENT_OCCUPATIONS.map((title) => (
-                    <option key={title} value={title}>{title}</option>
-                  ))}
-                </select>
+                <SelectControl
+                  label="Occupation"
+                  value={activeEmploymentOccupation}
+                  onChange={setActiveEmploymentOccupation}
+                  options={EMPLOYMENT_OCCUPATIONS.map((title) => ({ value: title, label: title }))}
+                />
               </>
             ) : (
               <>
-                <label>SDG</label>
-                <select value={activeEmploymentSdg} onChange={(e) => setActiveEmploymentSdg(e.target.value)}>
-                  {EMPLOYMENT_SDGS.map((sdg) => (
-                    <option key={sdg} value={sdg}>{sdg}</option>
-                  ))}
-                </select>
+                <SelectControl
+                  label="SDG"
+                  value={activeEmploymentSdg}
+                  onChange={setActiveEmploymentSdg}
+                  options={EMPLOYMENT_SDGS.map((sdg) => ({ value: sdg, label: sdg }))}
+                />
               </>
             )}
 
@@ -830,17 +807,12 @@ export default function App() {
                   <div className="panelHeader">
                     <h3>{activeEmploymentSdg} Occupation Statistics</h3>
                     {sdgAvailableYears.length > 0 && (
-                      <label className="inlineControl">
-                        <span>Year</span>
-                        <select
-                          value={activeEmploymentYear ?? sdgAvailableYears[0]}
-                          onChange={(e) => setActiveEmploymentYear(Number(e.target.value))}
-                        >
-                          {sdgAvailableYears.map((year) => (
-                            <option key={year} value={year}>{year}</option>
-                          ))}
-                        </select>
-                      </label>
+                      <SelectControl
+                        label="Year"
+                        value={String(activeEmploymentYear ?? sdgAvailableYears[0])}
+                        onChange={(val) => setActiveEmploymentYear(Number(val))}
+                        options={sdgAvailableYears.map((year) => ({ value: String(year), label: String(year) }))}
+                      />
                     )}
                   </div>
                   {sdgLatestRows.length ? (
@@ -878,6 +850,39 @@ export default function App() {
         )}
       </div>
     </div>
+  )
+}
+
+type SelectOption = { value: string | number; label?: string }
+
+function SelectControl({
+  label,
+  value,
+  onChange,
+  options,
+  disabled
+}: {
+  label: string
+  value: string | number
+  options: SelectOption[]
+  disabled?: boolean
+  onChange: (value: string) => void
+}) {
+  return (
+    <label className="inlineControl">
+      <span>{label}</span>
+      <select
+        value={String(value)}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+      >
+        {options.map((opt) => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label ?? opt.value}
+          </option>
+        ))}
+      </select>
+    </label>
   )
 }
 
