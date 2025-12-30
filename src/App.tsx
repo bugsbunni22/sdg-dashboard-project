@@ -224,7 +224,7 @@ export default function App() {
   n_detailed_jobs: number
 }
 
-const [stateRemoteRows, setStateRemoteRows] =
+const [_, setStateRemoteRows] =
   React.useState<StateRemoteRow[] | null>(null)
 
 React.useEffect(() => {
