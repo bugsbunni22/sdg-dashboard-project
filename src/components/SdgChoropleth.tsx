@@ -306,6 +306,7 @@ function ResetViewButton({ center, zoom }: { center: L.LatLngExpression; zoom: n
   );
 }
 
+
 export default function SdgChoropleth({
   geojson,
   idProperty = "GEOID",
