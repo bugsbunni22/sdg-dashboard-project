@@ -39,7 +39,7 @@ export function Toolbar({
   year: number;
   view: "Current" | "Trend";
   sdg: string;
-  onYear: (y: number) => void;              // ✅ 오타 수정
+  onYear: (y: number) => void;
   onView: (v: "Current" | "Trend") => void;
   onSDG: (s: string) => void;
   right?: ReactNode;

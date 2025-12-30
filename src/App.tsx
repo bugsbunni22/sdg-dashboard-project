@@ -7,8 +7,15 @@ import countiesGeojsonRaw from './data/counties_500k.json'
 import statesGeojsonRaw from './data/usa_state_20m.json'
 import msaToCountiesRows from './data/msaTOcounties.json'
 import employmentRowsData from './data/emp_AnnualSalary.json'
+import sdgRemoteRateRows from './data/sdg_remote_rate.json'
 import { buildMsaToCountiesFromList } from './utils/crosswalk'
-import { buildRemoteFlagLookup, normalizeOccupationTitle, type RemoteFlagRow } from './utils/remoteFlag'
+import {
+  buildRemoteFlagLookup,
+  normalizeOccupationTitle,
+  buildRemoteWorkByState,
+  type RemoteFlagRow
+} from './utils/remoteFlag'
+
 
 type Row = { area_name: string; sdg: string; sdg_lq: number }
 type EungMsa = Row[]
@@ -24,8 +31,13 @@ type EmploymentRow = {
   annual_w: number
   sdg: string
 }
+type SdgRemoteRateRow = {
+  SDG: string
+  Total_Count: number
+  Remote_Count: number
+  'Remote_Rate_%': number
+}
 
-type MapPage = 'msa' | 'state' | 'employment'
 
 function sortSdgKeys(keys: string[]) {
   const rx = /^SDG-(\d{1,2})$/i
@@ -150,10 +162,13 @@ const getEmploymentOptions = (rows: EmploymentRow[]) =>
 
 const EMPLOYMENT_OCCUPATIONS = getEmploymentOptions(employmentRows)
 
+type MapPage = 'msa' | 'state' | 'employment' | 'remote';
+
 const MAP_TABS: { id: MapPage; label: string }[] = [
   { id: 'msa', label: 'MSA Map' },
   { id: 'state', label: 'State Map' },
-  { id: 'employment', label: 'Employment Insights' }
+  { id: 'employment', label: 'Employment Insights' },
+  { id: 'remote', label: 'Remote Work Insight' }
 ]
 const CONTIGUOUS_US_BOUNDS: LatLngBoundsExpression = [
   [24.396308, -124.848974],
@@ -202,6 +217,36 @@ export default function App() {
   const [activeEmploymentYear, setActiveEmploymentYear] = React.useState<number | null>(null)
   const [remoteFlagRows, setRemoteFlagRows] = React.useState<RemoteFlagRow[] | null>(null)
 
+  type StateRemoteRow = {
+  state: string
+  state_fips: string | null
+  remote_job_ratio: number
+  n_detailed_jobs: number
+}
+
+const [stateRemoteRows, setStateRemoteRows] =
+  React.useState<StateRemoteRow[] | null>(null)
+
+React.useEffect(() => {
+  let cancelled = false
+  ;(async () => {
+    try {
+      const res = await fetch(
+        `${import.meta.env.BASE_URL}data/state_remote_viz.json`
+      )
+      if (!res.ok) throw new Error('state_remote_viz.json fetch failed')
+      const json = (await res.json()) as StateRemoteRow[]
+      if (!cancelled) setStateRemoteRows(json)
+    } catch (e) {
+      console.error(e)
+      if (!cancelled) setStateRemoteRows([])
+    }
+  })()
+  return () => {
+    cancelled = true
+  }
+}, [])
+
   React.useEffect(() => {
     let cancelled = false
     ;(async () => {
@@ -219,6 +264,8 @@ export default function App() {
       cancelled = true
     }
   }, [])
+
+
 
   const remoteFlagByOccupation = React.useMemo(
     () => buildRemoteFlagLookup(remoteFlagRows ?? []),
@@ -300,6 +347,43 @@ export default function App() {
     () => buildStateMetrics(stateEung),
     [stateEung]
   )
+
+  const remoteWorkByState = React.useMemo(
+  () => buildRemoteWorkByState(remoteFlagRows ?? []),
+  [remoteFlagRows]
+)
+
+const remoteStateMetrics: Record<string, { remote: number }> =
+  React.useMemo(() => {
+    if (!stateRemoteRows?.length) return {}
+
+    const out: Record<string, { remote: number }> = {}
+
+    for (const row of stateRemoteRows) {
+      // 다주 조합 / null 제거
+      if (!row.state_fips) continue
+
+      out[row.state_fips] = {
+        remote: row.remote_job_ratio
+      }
+    }
+
+    return out
+  }, [stateRemoteRows])
+
+// SDG-level remote work rate (sidebar bar chart)
+const sdgRemoteRateChartData = React.useMemo(() => {
+  const rows = sdgRemoteRateRows as SdgRemoteRateRow[]
+
+  return rows
+    .slice()
+    .sort((a, b) => a.SDG.localeCompare(b.SDG))
+    .map((row) => ({
+      label: row.SDG,
+      value: row['Remote_Rate_%']
+    }))
+}, [])
+
 
   const activeCountySet = React.useMemo(() => {
     const msa = (activeMsa ?? '').trim()
@@ -627,6 +711,7 @@ export default function App() {
               </div>
             </aside>
           </div>
+
         ) : activePage === 'state' ? (
           <div className="mapWithSidebar">
             <div className="mapWrap">
@@ -669,7 +754,7 @@ export default function App() {
               </div>
             </aside>
           </div>
-        ) : (
+        ) : activePage === 'employment' ? (
           <div className="employmentContent">
             {employmentFilterType === 'occupation' ? (
               <>
@@ -847,7 +932,71 @@ export default function App() {
               </>
             )}
           </div>
-        )}
+        ) : activePage === 'remote' ? (
+          <div className="mapWithSidebar">
+            <div className="mapWrap">
+               <SdgChoropleth
+                dataKey="remote"
+                geojson={stateGeojson}
+                idProperty="STATE"
+                data={remoteStateMetrics}
+                years={['remote']}
+                initialYear="remote"
+                title="Remote Work Feasibility by State"
+                valueFormatter={(v) =>
+                  typeof v === 'number' ? `${(v * 100).toFixed(1)}%` : 'N/A'
+                }
+                center={[37.8, -96]}
+                zoom={4}
+                maxBounds={CONTIGUOUS_US_BOUNDS}
+                maxBoundsViscosity={1}
+                showBasemap={false}
+                showCategoryControl={false}
+                showResetButton={false}
+                onFeatureClick={(feature) => {
+                  const stateId = (feature as any)?.properties?.STATE
+                  if (stateId) setActiveStateId(stateId)
+                }}
+              />
+            </div>
+
+            <aside className="msaSidebar">
+              <h3>Remote Work Insight</h3>
+
+              <p className="msaName">
+                {activeStateName ?? 'Select a state'}
+              </p>
+
+              {/* 주 단위 요약 */}
+              {activeStateId && remoteStateMetrics[activeStateId] && (
+                <div className="statsGrid">
+                  <div className="statCard">
+                    <span className="statLabel">
+                      Remote-capable occupations
+                    </span>
+                    <span className="statValue">
+                      {(remoteStateMetrics[activeStateId].remote * 100).toFixed(1)}%
+                    </span>
+                    <small>
+                      Share of detailed occupations<br />
+                      (source: state_remote_viz.json)
+                    </small>
+                  </div>
+                </div>
+              )}
+
+              <div className="sidebarChartWrap">
+                <h4>Remote Rate by SDG</h4>
+
+                <SdgBarChart
+                  data={sdgRemoteRateChartData}
+                  valueFormatter={(v) => `${v.toFixed(1)}%`}
+                  emptyMessage="No SDG remote rate data available."
+                />
+              </div>
+            </aside>
+          </div>
+        ) : null}
       </div>
     </div>
   )

@@ -1,0 +1,524 @@
+[
+  {
+    "state": "AK",
+    "remote_job_ratio": 0.3650677334,
+    "n_detailed_jobs": 428,
+    "state_fips": "02"
+  },
+  {
+    "state": "AL",
+    "remote_job_ratio": 0.364012194,
+    "n_detailed_jobs": 555,
+    "state_fips": "01"
+  },
+  {
+    "state": "AR",
+    "remote_job_ratio": 0.3506660113,
+    "n_detailed_jobs": 524,
+    "state_fips": "05"
+  },
+  {
+    "state": "AR-OK",
+    "remote_job_ratio": 0.3463089802,
+    "n_detailed_jobs": 292,
+    "state_fips": null
+  },
+  {
+    "state": "AZ",
+    "remote_job_ratio": 0.3587322171,
+    "n_detailed_jobs": 666,
+    "state_fips": "04"
+  },
+  {
+    "state": "CA",
+    "remote_job_ratio": 0.3343714565,
+    "n_detailed_jobs": 775,
+    "state_fips": "06"
+  },
+  {
+    "state": "CO",
+    "remote_job_ratio": 0.3571059781,
+    "n_detailed_jobs": 673,
+    "state_fips": "08"
+  },
+  {
+    "state": "CT",
+    "remote_job_ratio": 0.3723855719,
+    "n_detailed_jobs": 606,
+    "state_fips": "09"
+  },
+  {
+    "state": "DC-VA-MD-WV",
+    "remote_job_ratio": 0.3619266899,
+    "n_detailed_jobs": 714,
+    "state_fips": null
+  },
+  {
+    "state": "DE",
+    "remote_job_ratio": 0.4088070629,
+    "n_detailed_jobs": 258,
+    "state_fips": "10"
+  },
+  {
+    "state": "FL",
+    "remote_job_ratio": 0.3397569882,
+    "n_detailed_jobs": 722,
+    "state_fips": "12"
+  },
+  {
+    "state": "GA",
+    "remote_job_ratio": 0.3488652574,
+    "n_detailed_jobs": 701,
+    "state_fips": "13"
+  },
+  {
+    "state": "GA-AL",
+    "remote_job_ratio": 0.3669953264,
+    "n_detailed_jobs": 335,
+    "state_fips": null
+  },
+  {
+    "state": "GA-SC",
+    "remote_job_ratio": 0.3507161686,
+    "n_detailed_jobs": 433,
+    "state_fips": null
+  },
+  {
+    "state": "HI",
+    "remote_job_ratio": 0.372526905,
+    "n_detailed_jobs": 489,
+    "state_fips": "15"
+  },
+  {
+    "state": "IA",
+    "remote_job_ratio": 0.3809878445,
+    "n_detailed_jobs": 531,
+    "state_fips": "19"
+  },
+  {
+    "state": "IA-IL",
+    "remote_job_ratio": 0.3743145743,
+    "n_detailed_jobs": 427,
+    "state_fips": null
+  },
+  {
+    "state": "IA-NE-SD",
+    "remote_job_ratio": 0.3430846931,
+    "n_detailed_jobs": 286,
+    "state_fips": null
+  },
+  {
+    "state": "ID",
+    "remote_job_ratio": 0.3845241681,
+    "n_detailed_jobs": 503,
+    "state_fips": "16"
+  },
+  {
+    "state": "ID-WA",
+    "remote_job_ratio": 0.3394854586,
+    "n_detailed_jobs": 149,
+    "state_fips": null
+  },
+  {
+    "state": "IL",
+    "remote_job_ratio": 0.398309082,
+    "n_detailed_jobs": 454,
+    "state_fips": "17"
+  },
+  {
+    "state": "IL-IN",
+    "remote_job_ratio": 0.3551739462,
+    "n_detailed_jobs": 716,
+    "state_fips": null
+  },
+  {
+    "state": "IN",
+    "remote_job_ratio": 0.3511336273,
+    "n_detailed_jobs": 646,
+    "state_fips": "18"
+  },
+  {
+    "state": "IN-MI",
+    "remote_job_ratio": 0.3878967795,
+    "n_detailed_jobs": 393,
+    "state_fips": null
+  },
+  {
+    "state": "KS",
+    "remote_job_ratio": 0.3569537589,
+    "n_detailed_jobs": 488,
+    "state_fips": "20"
+  },
+  {
+    "state": "KY",
+    "remote_job_ratio": 0.3871995442,
+    "n_detailed_jobs": 461,
+    "state_fips": "21"
+  },
+  {
+    "state": "KY-IL",
+    "remote_job_ratio": 0.3697021764,
+    "n_detailed_jobs": 194,
+    "state_fips": null
+  },
+  {
+    "state": "KY-IN",
+    "remote_job_ratio": 0.3529566313,
+    "n_detailed_jobs": 569,
+    "state_fips": null
+  },
+  {
+    "state": "LA",
+    "remote_job_ratio": 0.3624958709,
+    "n_detailed_jobs": 581,
+    "state_fips": "22"
+  },
+  {
+    "state": "MA",
+    "remote_job_ratio": 0.3837189727,
+    "n_detailed_jobs": 516,
+    "state_fips": "25"
+  },
+  {
+    "state": "MA-NH",
+    "remote_job_ratio": 0.3546932742,
+    "n_detailed_jobs": 697,
+    "state_fips": null
+  },
+  {
+    "state": "MD",
+    "remote_job_ratio": 0.3555623806,
+    "n_detailed_jobs": 666,
+    "state_fips": "24"
+  },
+  {
+    "state": "MD-WV",
+    "remote_job_ratio": 0.3514641969,
+    "n_detailed_jobs": 337,
+    "state_fips": null
+  },
+  {
+    "state": "ME",
+    "remote_job_ratio": 0.3604450883,
+    "n_detailed_jobs": 502,
+    "state_fips": "23"
+  },
+  {
+    "state": "MI",
+    "remote_job_ratio": 0.3497167325,
+    "n_detailed_jobs": 690,
+    "state_fips": "26"
+  },
+  {
+    "state": "MN",
+    "remote_job_ratio": 0.3859815774,
+    "n_detailed_jobs": 386,
+    "state_fips": "27"
+  },
+  {
+    "state": "MN-WI",
+    "remote_job_ratio": 0.3667642247,
+    "n_detailed_jobs": 673,
+    "state_fips": null
+  },
+  {
+    "state": "MO",
+    "remote_job_ratio": 0.3784386659,
+    "n_detailed_jobs": 444,
+    "state_fips": "29"
+  },
+  {
+    "state": "MO-IL",
+    "remote_job_ratio": 0.3603135427,
+    "n_detailed_jobs": 663,
+    "state_fips": null
+  },
+  {
+    "state": "MO-KS",
+    "remote_job_ratio": 0.3599594673,
+    "n_detailed_jobs": 628,
+    "state_fips": null
+  },
+  {
+    "state": "MS",
+    "remote_job_ratio": 0.3612189085,
+    "n_detailed_jobs": 506,
+    "state_fips": "28"
+  },
+  {
+    "state": "MT",
+    "remote_job_ratio": 0.3580068677,
+    "n_detailed_jobs": 403,
+    "state_fips": "30"
+  },
+  {
+    "state": "NC",
+    "remote_job_ratio": 0.366718055,
+    "n_detailed_jobs": 629,
+    "state_fips": "37"
+  },
+  {
+    "state": "NC-SC",
+    "remote_job_ratio": 0.3577323386,
+    "n_detailed_jobs": 658,
+    "state_fips": null
+  },
+  {
+    "state": "ND",
+    "remote_job_ratio": 0.3727781285,
+    "n_detailed_jobs": 288,
+    "state_fips": "38"
+  },
+  {
+    "state": "ND-MN",
+    "remote_job_ratio": 0.3678820222,
+    "n_detailed_jobs": 406,
+    "state_fips": null
+  },
+  {
+    "state": "NE",
+    "remote_job_ratio": 0.4075979704,
+    "n_detailed_jobs": 432,
+    "state_fips": "31"
+  },
+  {
+    "state": "NE-IA",
+    "remote_job_ratio": 0.3677442878,
+    "n_detailed_jobs": 561,
+    "state_fips": null
+  },
+  {
+    "state": "NH",
+    "remote_job_ratio": 0.3896981046,
+    "n_detailed_jobs": 445,
+    "state_fips": "33"
+  },
+  {
+    "state": "NJ",
+    "remote_job_ratio": 0.3922704451,
+    "n_detailed_jobs": 509,
+    "state_fips": "34"
+  },
+  {
+    "state": "NM",
+    "remote_job_ratio": 0.3839401846,
+    "n_detailed_jobs": 511,
+    "state_fips": "35"
+  },
+  {
+    "state": "NV",
+    "remote_job_ratio": 0.3459744262,
+    "n_detailed_jobs": 613,
+    "state_fips": "32"
+  },
+  {
+    "state": "NY",
+    "remote_job_ratio": 0.36464569,
+    "n_detailed_jobs": 652,
+    "state_fips": "36"
+  },
+  {
+    "state": "NY-NJ",
+    "remote_job_ratio": 0.3375495796,
+    "n_detailed_jobs": 764,
+    "state_fips": null
+  },
+  {
+    "state": "OH",
+    "remote_job_ratio": 0.3422910995,
+    "n_detailed_jobs": 679,
+    "state_fips": "39"
+  },
+  {
+    "state": "OH-KY-IN",
+    "remote_job_ratio": 0.3608037926,
+    "n_detailed_jobs": 636,
+    "state_fips": null
+  },
+  {
+    "state": "OK",
+    "remote_job_ratio": 0.3570830454,
+    "n_detailed_jobs": 614,
+    "state_fips": "40"
+  },
+  {
+    "state": "OR",
+    "remote_job_ratio": 0.3586792377,
+    "n_detailed_jobs": 503,
+    "state_fips": "41"
+  },
+  {
+    "state": "OR-WA",
+    "remote_job_ratio": 0.3541550202,
+    "n_detailed_jobs": 683,
+    "state_fips": null
+  },
+  {
+    "state": "PA",
+    "remote_job_ratio": 0.3545349949,
+    "n_detailed_jobs": 676,
+    "state_fips": "42"
+  },
+  {
+    "state": "PA-NJ",
+    "remote_job_ratio": 0.3703684014,
+    "n_detailed_jobs": 513,
+    "state_fips": null
+  },
+  {
+    "state": "PA-NJ-DE-MD",
+    "remote_job_ratio": 0.3498699529,
+    "n_detailed_jobs": 734,
+    "state_fips": null
+  },
+  {
+    "state": "PR",
+    "remote_job_ratio": 0.3774868142,
+    "n_detailed_jobs": 519,
+    "state_fips": "72"
+  },
+  {
+    "state": "RI-MA",
+    "remote_job_ratio": 0.3669427609,
+    "n_detailed_jobs": 600,
+    "state_fips": null
+  },
+  {
+    "state": "SC",
+    "remote_job_ratio": 0.3635644497,
+    "n_detailed_jobs": 611,
+    "state_fips": "45"
+  },
+  {
+    "state": "SD",
+    "remote_job_ratio": 0.3609219283,
+    "n_detailed_jobs": 299,
+    "state_fips": "46"
+  },
+  {
+    "state": "SD-MN",
+    "remote_job_ratio": 0.3461849067,
+    "n_detailed_jobs": 399,
+    "state_fips": null
+  },
+  {
+    "state": "TN",
+    "remote_job_ratio": 0.3557443595,
+    "n_detailed_jobs": 642,
+    "state_fips": "47"
+  },
+  {
+    "state": "TN-GA",
+    "remote_job_ratio": 0.3518292818,
+    "n_detailed_jobs": 455,
+    "state_fips": null
+  },
+  {
+    "state": "TN-KY",
+    "remote_job_ratio": 0.3713827236,
+    "n_detailed_jobs": 299,
+    "state_fips": null
+  },
+  {
+    "state": "TN-MS-AR",
+    "remote_job_ratio": 0.3550329686,
+    "n_detailed_jobs": 576,
+    "state_fips": null
+  },
+  {
+    "state": "TN-VA",
+    "remote_job_ratio": 0.3579771705,
+    "n_detailed_jobs": 346,
+    "state_fips": null
+  },
+  {
+    "state": "TX",
+    "remote_job_ratio": 0.3369233229,
+    "n_detailed_jobs": 758,
+    "state_fips": "48"
+  },
+  {
+    "state": "TX-AR",
+    "remote_job_ratio": 0.3468219311,
+    "n_detailed_jobs": 229,
+    "state_fips": null
+  },
+  {
+    "state": "UT",
+    "remote_job_ratio": 0.3662825437,
+    "n_detailed_jobs": 639,
+    "state_fips": "49"
+  },
+  {
+    "state": "UT-ID",
+    "remote_job_ratio": 0.3556828124,
+    "n_detailed_jobs": 254,
+    "state_fips": null
+  },
+  {
+    "state": "VA",
+    "remote_job_ratio": 0.3821053343,
+    "n_detailed_jobs": 598,
+    "state_fips": "51"
+  },
+  {
+    "state": "VA-NC",
+    "remote_job_ratio": 0.3749272968,
+    "n_detailed_jobs": 587,
+    "state_fips": null
+  },
+  {
+    "state": "VA-WV",
+    "remote_job_ratio": 0.3513558825,
+    "n_detailed_jobs": 241,
+    "state_fips": null
+  },
+  {
+    "state": "VT",
+    "remote_job_ratio": 0.3910067597,
+    "n_detailed_jobs": 393,
+    "state_fips": "50"
+  },
+  {
+    "state": "WA",
+    "remote_job_ratio": 0.3526078842,
+    "n_detailed_jobs": 709,
+    "state_fips": "53"
+  },
+  {
+    "state": "WI",
+    "remote_job_ratio": 0.3590229367,
+    "n_detailed_jobs": 639,
+    "state_fips": "55"
+  },
+  {
+    "state": "WI-MN",
+    "remote_job_ratio": 0.4072313297,
+    "n_detailed_jobs": 305,
+    "state_fips": null
+  },
+  {
+    "state": "WV",
+    "remote_job_ratio": 0.3823218636,
+    "n_detailed_jobs": 369,
+    "state_fips": "54"
+  },
+  {
+    "state": "WV-KY-OH",
+    "remote_job_ratio": 0.3670038147,
+    "n_detailed_jobs": 376,
+    "state_fips": null
+  },
+  {
+    "state": "WV-OH",
+    "remote_job_ratio": 0.3446495025,
+    "n_detailed_jobs": 266,
+    "state_fips": null
+  },
+  {
+    "state": "WY",
+    "remote_job_ratio": 0.3625240257,
+    "n_detailed_jobs": 247,
+    "state_fips": "56"
+  }
+]
