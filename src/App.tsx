@@ -348,28 +348,19 @@ React.useEffect(() => {
     [stateEung]
   )
 
-  const remoteWorkByState = React.useMemo(
-  () => buildRemoteWorkByState(remoteFlagRows ?? []),
+const remoteStateMetrics: Record<string, { remote: number }> = React.useMemo(
+  () => {
+    const byState = buildRemoteWorkByState(remoteFlagRows ?? [])
+
+    return Object.fromEntries(
+      Object.entries(byState).map(([state, value]) => [
+        toStateId(state),
+        { remote: value }
+      ])
+    )
+  },
   [remoteFlagRows]
 )
-
-const remoteStateMetrics: Record<string, { remote: number }> =
-  React.useMemo(() => {
-    if (!stateRemoteRows?.length) return {}
-
-    const out: Record<string, { remote: number }> = {}
-
-    for (const row of stateRemoteRows) {
-      // 다주 조합 / null 제거
-      if (!row.state_fips) continue
-
-      out[row.state_fips] = {
-        remote: row.remote_job_ratio
-      }
-    }
-
-    return out
-  }, [stateRemoteRows])
 
 // SDG-level remote work rate (sidebar bar chart)
 const sdgRemoteRateChartData = React.useMemo(() => {
