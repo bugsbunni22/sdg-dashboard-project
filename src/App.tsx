@@ -12,7 +12,6 @@ import { buildMsaToCountiesFromList } from './utils/crosswalk'
 import {
   buildRemoteFlagLookup,
   normalizeOccupationTitle,
-  buildRemoteWorkByState,
   type RemoteFlagRow
 } from './utils/remoteFlag'
 
