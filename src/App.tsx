@@ -224,7 +224,7 @@ export default function App() {
   n_detailed_jobs: number
 }
 
-const [_, setStateRemoteRows] =
+const [stateRemoteRows, setStateRemoteRows] =
   React.useState<StateRemoteRow[] | null>(null)
 
 React.useEffect(() => {
@@ -350,16 +350,21 @@ React.useEffect(() => {
 
 const remoteStateMetrics: Record<string, { remote: number }> = React.useMemo(
   () => {
-    const byState = buildRemoteWorkByState(remoteFlagRows ?? [])
+    if (!stateRemoteRows) return {}
 
-    return Object.fromEntries(
-      Object.entries(byState).map(([state, value]) => [
-        toStateId(state),
-        { remote: value }
-      ])
-    )
+    const out: Record<string, { remote: number }> = {}
+
+    for (const row of stateRemoteRows) {
+      if (!row.state_fips) continue   // FIPS 없는 경우 제외
+
+      out[row.state_fips] = {
+        remote: row.remote_job_ratio  // 이미 0~1 비율
+      }
+    }
+
+    return out
   },
-  [remoteFlagRows]
+  [stateRemoteRows]
 )
 
 // SDG-level remote work rate (sidebar bar chart)
